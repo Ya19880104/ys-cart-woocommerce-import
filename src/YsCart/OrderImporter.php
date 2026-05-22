@@ -76,6 +76,7 @@ final class OrderImporter
         $orderSources = new OrderSourceRepository();
         $existingSourceOrderId = $orderSources->findOrderId($fingerprint, $sourceId);
         if ($existingSourceOrderId) {
+            $this->backfillExistingOrderShipping($existingSourceOrderId, $record);
             $mapRepo->upsert($jobId, $fingerprint, 'order', $sourceId, $existingSourceOrderId, 'ys_order', [
                 'source_order_number' => (string)($record['number'] ?? ''),
                 'source_table' => 'ys_ec_order_sources',
@@ -85,6 +86,7 @@ final class OrderImporter
 
         $existingMap = $mapRepo->find($fingerprint, 'order', $sourceId);
         if ($existingMap) {
+            $this->backfillExistingOrderShipping((int)$existingMap->target_id, $record);
             // v0.2.1 nit B1：legacy map backfill 不驗證 target_id 仍對應有效 YS order。
             // 若該 YS order 已被人工刪除 / 屬於不同 fingerprint，upsertWooOrder 會碰到
             // uk_order_platform unique constraint、$wpdb->query 回 false → silent ignore、
@@ -119,6 +121,45 @@ final class OrderImporter
         ]);
         $orderSources->upsertWooOrder($orderId, $fingerprint, $record);
         return $orderId;
+    }
+
+    private function backfillExistingOrderShipping(int $orderId, array $record): void
+    {
+        if ($orderId <= 0 || !method_exists(self::YS_ORDER, 'table')) {
+            return;
+        }
+
+        $mapped = OrderMapper::mapOrder($record, 0, 0);
+        $incoming = [
+            'shipping_method_id' => (string)($mapped['shipping_method_id'] ?? ''),
+            'shipping_provider' => (string)($mapped['shipping_provider'] ?? ''),
+        ];
+        if ($incoming['shipping_method_id'] === '' && $incoming['shipping_provider'] === '') {
+            return;
+        }
+
+        global $wpdb;
+        $class = self::YS_ORDER;
+        $table = $class::table();
+        $current = $wpdb->get_row($wpdb->prepare(
+            "SELECT shipping_method_id, shipping_provider FROM {$table} WHERE id = %d",
+            $orderId
+        ), ARRAY_A);
+        if (!is_array($current)) {
+            return;
+        }
+
+        $updates = [];
+        foreach ($incoming as $field => $value) {
+            if ($value !== '' && trim((string)($current[$field] ?? '')) === '') {
+                $updates[$field] = $value;
+            }
+        }
+
+        if ($updates !== []) {
+            $updates['updated_at'] = current_time('mysql');
+            $wpdb->update($table, $updates, ['id' => $orderId]);
+        }
     }
 
     private function resolveCustomer(int $jobId, string $fingerprint, array $record): array

@@ -14,11 +14,13 @@ $tests = [
     'static/admin-user-role-guard.php',
     'static/order-source-integration.php',
     'static/customer-export-excludes-imported-users.php',
+    'static/order-existing-shipping-backfill.php',
     'unit/status-mapper.php',
     'unit/package-validator.php',
     'unit/order-source-repository.php',
     'unit/customer-importer-user-retry.php',
     'unit/package-writer-reset.php',
+    'unit/order-mapper-shipping.php',
 ];
 
 $failures = 0;

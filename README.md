@@ -12,6 +12,8 @@ Standalone WordPress plugin for exporting WooCommerce data and importing it into
 
 - Export WooCommerce customers, products, and orders into JSONL-based zip packages.
 - Import customers, products, variants, and orders into YS CART.
+- Import regular WooCommerce products in the general engine: simple products, variable products, attributes, and variations.
+- Keep subscription products out of the general product engine. Subscription products should be imported by a separate optional subscription engine.
 - Run migration work through REST-triggered jobs.
 - Use Action Scheduler when available and WP-Cron as fallback.
 - Avoid WordPress admin request endpoints entirely.
@@ -21,6 +23,7 @@ Standalone WordPress plugin for exporting WooCommerce data and importing it into
 - WooCommerce orders are read through `wc_get_orders()` for HPOS compatibility.
 - Cross-site missing users are auto-created with random passwords and `_ys_wc_imported_user = 1`.
 - Woo order items do not require real product binding. If no migrated product map exists, the importer creates a hidden placeholder product named `WooCommerce Imported Item`.
+- Woo order shipping lines preserve the first shipping line `method_id` as YS CART `shipping_method_id`, and the shipping line name as `shipping_provider`.
 - Product matching uses source map, SKU, then slug.
 - Variable products create YS CART variable products plus variant rows.
 
