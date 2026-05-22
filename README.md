@@ -31,6 +31,10 @@ Standalone WordPress plugin for exporting WooCommerce data and importing it into
 
 Open:
 
+`電商系統 > WooCommerce Import`
+
+On WooCommerce-only export sites without YS CART, the fallback location is:
+
 `Tools > YS CART Woo Import`
 
 The UI calls REST routes under:

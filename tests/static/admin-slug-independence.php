@@ -15,8 +15,8 @@ if ($slug === 'ys-cart') {
     throw new RuntimeException('Admin page slug must not collide with the YS CART main admin page.');
 }
 
-if (strpos($adminPage, "add_submenu_page('ys-cart'") === false
-    && strpos($adminPage, 'add_submenu_page("ys-cart"') === false) {
+if (strpos($adminPage, 'add_submenu_page') === false
+    || (strpos($adminPage, "'ys-cart'") === false && strpos($adminPage, '"ys-cart"') === false)) {
     throw new RuntimeException('Admin page must register under the YS CART ecommerce menu when YS CART is available.');
 }
 
@@ -24,6 +24,8 @@ if (strpos($adminPage, 'add_management_page') === false) {
     throw new RuntimeException('Admin page must keep a Tools fallback for WooCommerce export-only sites.');
 }
 
-if (strpos($template, 'YSAdminApp::open') === false || strpos($template, 'YSAdminApp::close') === false) {
+if (strpos($template, '\YangSheep\Ecommerce\Admin\YSAdminApp') === false
+    || strpos($template, '::open') === false
+    || strpos($template, '::close') === false) {
     throw new RuntimeException('Admin template must use the YS CART admin shell when available.');
 }

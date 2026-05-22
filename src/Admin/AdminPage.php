@@ -7,10 +7,23 @@ defined('ABSPATH') || exit;
 
 final class AdminPage
 {
-    public const SLUG = 'ys-cwci';
+    public const SLUG = 'ys-ec-woo-import';
+    private const YS_ADMIN_APP = '\YangSheep\Ecommerce\Admin\YSAdminApp';
 
     public function register(): void
     {
+        if (class_exists(self::YS_ADMIN_APP)) {
+            add_submenu_page(
+                'ys-cart',
+                __('WooCommerce Import', 'ys-cart-woocommerce-import'),
+                __('WooCommerce Import', 'ys-cart-woocommerce-import'),
+                'manage_options',
+                self::SLUG,
+                [$this, 'render']
+            );
+            return;
+        }
+
         add_management_page(
             __('YS CART Woo Import', 'ys-cart-woocommerce-import'),
             __('YS CART Woo Import', 'ys-cart-woocommerce-import'),
