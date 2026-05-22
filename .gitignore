@@ -1,0 +1,6 @@
+/vendor/
+/dist/
+/.phpunit.result.cache
+*.zip
+*.log
+

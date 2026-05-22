@@ -1,0 +1,24 @@
+{
+    "name": "yangsheep/ys-cart-woocommerce-import",
+    "description": "Standalone WooCommerce export and YS CART import bridge.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+        {
+            "name": "YANGSHEEP DESIGN",
+            "homepage": "https://yangsheep.com.tw"
+        }
+    ],
+    "require": {
+        "php": ">=8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "YangSheep\\YsCartWooImport\\": "src/"
+        }
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}
+
