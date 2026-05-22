@@ -43,7 +43,7 @@ final class JobRunner
             $result = $this->dispatch($job);
             if (($result['done'] ?? false) === true) {
                 if ($job->type === 'export') {
-                    $this->finalizeExport($job);
+                    $this->finalizeExport($repo->find($jobId) ?: $job);
                 }
                 $repo->complete($jobId);
             } else {
