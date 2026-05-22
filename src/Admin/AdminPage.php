@@ -7,7 +7,7 @@ defined('ABSPATH') || exit;
 
 final class AdminPage
 {
-    public const SLUG = 'ys-cart-woocommerce-import';
+    public const SLUG = 'ys-cwci';
 
     public function register(): void
     {
@@ -52,4 +52,3 @@ final class AdminPage
         require YS_CWCI_PLUGIN_DIR . 'templates/admin/app.php';
     }
 }
-
