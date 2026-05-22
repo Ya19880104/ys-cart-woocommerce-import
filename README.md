@@ -23,7 +23,7 @@ Standalone WordPress plugin for exporting WooCommerce data and importing it into
 - WooCommerce orders are read through `wc_get_orders()` for HPOS compatibility.
 - Cross-site missing users are auto-created with random passwords and `_ys_wc_imported_user = 1`.
 - Woo order items do not require real product binding. If no migrated product map exists, the importer creates a hidden placeholder product named `WooCommerce Imported Item`.
-- Woo order shipping lines preserve the first shipping line `method_id` as YS CART `shipping_method_id`, and the shipping line name as `shipping_provider`.
+- Woo order shipping lines preserve the shipping line name as `shipping_provider`. Woo `method_id` is not written into YS CART `shipping_method_id` because it is not a reliable YS shipping registry key.
 - Product matching uses source map, SKU, then slug.
 - Variable products create YS CART variable products plus variant rows.
 

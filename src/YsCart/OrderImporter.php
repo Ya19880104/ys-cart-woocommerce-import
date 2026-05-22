@@ -131,10 +131,9 @@ final class OrderImporter
 
         $mapped = OrderMapper::mapOrder($record, 0, 0);
         $incoming = [
-            'shipping_method_id' => (string)($mapped['shipping_method_id'] ?? ''),
             'shipping_provider' => (string)($mapped['shipping_provider'] ?? ''),
         ];
-        if ($incoming['shipping_method_id'] === '' && $incoming['shipping_provider'] === '') {
+        if ($incoming['shipping_provider'] === '') {
             return;
         }
 
@@ -142,7 +141,7 @@ final class OrderImporter
         $class = self::YS_ORDER;
         $table = $class::table();
         $current = $wpdb->get_row($wpdb->prepare(
-            "SELECT shipping_method_id, shipping_provider FROM {$table} WHERE id = %d",
+            "SELECT shipping_provider FROM {$table} WHERE id = %d",
             $orderId
         ), ARRAY_A);
         if (!is_array($current)) {

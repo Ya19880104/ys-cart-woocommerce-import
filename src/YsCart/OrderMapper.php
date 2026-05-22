@@ -46,13 +46,11 @@ final class OrderMapper
         $billing = self::mapAddress(is_array($record['billing'] ?? null) ? $record['billing'] : []);
         $shipping = self::mapAddress(is_array($record['shipping'] ?? null) ? $record['shipping'] : []);
         $shippingMethods = is_array($record['shipping_methods'] ?? null) ? $record['shipping_methods'] : [];
-        $shippingMethodId = '';
         $shippingTitle = '';
 
         if ($shippingMethods !== []) {
             $first = reset($shippingMethods);
             if (is_array($first)) {
-                $shippingMethodId = (string)($first['method_id'] ?? '');
                 $shippingTitle = (string)($first['name'] ?? '');
             }
         }
@@ -76,7 +74,6 @@ final class OrderMapper
                 'method_title' => (string)($payment['method_title'] ?? ''),
             ],
             'paid_at' => self::mysqlDate((string)($payment['paid_at'] ?? '')),
-            'shipping_method_id' => $shippingMethodId,
             'shipping_provider' => $shippingTitle,
             'billing_name' => $billing['name'],
             'billing_phone' => $billing['phone'],

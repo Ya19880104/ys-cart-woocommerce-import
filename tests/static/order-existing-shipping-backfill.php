@@ -10,10 +10,17 @@ if (!is_file($importer)) {
 
 $contents = (string)file_get_contents($importer);
 
-foreach (['backfillExistingOrderShipping', 'shipping_method_id', 'shipping_provider'] as $needle) {
+foreach (['backfillExistingOrderShipping', 'shipping_provider'] as $needle) {
     if (strpos($contents, $needle) === false) {
         throw new RuntimeException("Order importer must backfill {$needle} for existing Woo-imported orders.");
     }
+}
+
+if (strpos($contents, "\$updates['shipping_method_id']") !== false
+    || strpos($contents, '$updates["shipping_method_id"]') !== false
+    || strpos($contents, "'shipping_method_id' =>") !== false
+    || strpos($contents, '"shipping_method_id" =>') !== false) {
+    throw new RuntimeException('Order importer must not backfill Woo method_id into YS shipping_method_id.');
 }
 
 $existingSourceBranch = strpos($contents, '$existingSourceOrderId') !== false

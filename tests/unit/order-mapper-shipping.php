@@ -55,8 +55,8 @@ $mapped = $class::mapOrder([
     ],
 ], 123, 456);
 
-if (($mapped['shipping_method_id'] ?? '') !== 'payuni_shipping_711_c2c_normal') {
-    throw new RuntimeException('Order mapper must preserve Woo shipping method_id as YS shipping_method_id.');
+if (array_key_exists('shipping_method_id', $mapped) && trim((string)$mapped['shipping_method_id']) !== '') {
+    throw new RuntimeException('Order mapper must not write Woo shipping method_id into YS shipping_method_id.');
 }
 
 if (($mapped['shipping_provider'] ?? '') !== 'PAYUNi 7-Eleven Store Pickup Normal') {
