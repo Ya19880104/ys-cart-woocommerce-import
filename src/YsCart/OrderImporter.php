@@ -72,8 +72,20 @@ final class OrderImporter
     private function importOrder(int $jobId, string $fingerprint, array $record): int
     {
         $mapRepo = new MapRepository();
-        $existingMap = $mapRepo->find($fingerprint, 'order', (string)($record['source_id'] ?? ''));
+        $sourceId = (string)($record['source_id'] ?? '');
+        $orderSources = new OrderSourceRepository();
+        $existingSourceOrderId = $orderSources->findOrderId($fingerprint, $sourceId);
+        if ($existingSourceOrderId) {
+            $mapRepo->upsert($jobId, $fingerprint, 'order', $sourceId, $existingSourceOrderId, 'ys_order', [
+                'source_order_number' => (string)($record['number'] ?? ''),
+                'source_table' => 'ys_ec_order_sources',
+            ]);
+            return $existingSourceOrderId;
+        }
+
+        $existingMap = $mapRepo->find($fingerprint, 'order', $sourceId);
         if ($existingMap) {
+            $orderSources->upsertWooOrder((int)$existingMap->target_id, $fingerprint, $record);
             return (int)$existingMap->target_id;
         }
 
@@ -98,7 +110,10 @@ final class OrderImporter
             $orderClass::add_item($orderId, OrderMapper::mapItem($item, $target['product_id'], $target['variant_id']));
         }
 
-        $mapRepo->upsert($jobId, $fingerprint, 'order', (string)$record['source_id'], $orderId, 'ys_order');
+        $mapRepo->upsert($jobId, $fingerprint, 'order', $sourceId, $orderId, 'ys_order', [
+            'source_order_number' => (string)($record['number'] ?? ''),
+        ]);
+        $orderSources->upsertWooOrder($orderId, $fingerprint, $record);
         return $orderId;
     }
 

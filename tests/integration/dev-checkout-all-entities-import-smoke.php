@@ -30,6 +30,8 @@ foreach ($required as $name => $ok) {
 $repo = new JobRepository();
 $runner = new JobRunner();
 $fingerprint = hash('sha256', home_url());
+$orderSourcesTable = $GLOBALS['wpdb']->prefix . 'ys_ec_order_sources';
+$hasOrderSourcesTable = table_exists($orderSourcesTable);
 $entities = [
     'customers' => 5,
     'products' => 5,
@@ -94,6 +96,7 @@ $counts = [
     'ys_customers' => (int)$wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}ys_ec_customers"),
     'ys_products' => (int)$wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}ys_ec_products"),
     'ys_orders' => (int)$wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}ys_ec_orders"),
+    'ys_order_sources' => $hasOrderSourcesTable ? (int)$wpdb->get_var("SELECT COUNT(*) FROM {$orderSourcesTable} WHERE source_platform = 'woocommerce'") : null,
     'maps' => $wpdb->get_results("SELECT entity, COUNT(*) AS total FROM {$wpdb->prefix}ys_wc_migration_maps GROUP BY entity ORDER BY entity", ARRAY_A),
 ];
 
@@ -113,6 +116,14 @@ foreach ($results as $entity => $result) {
     }
 }
 
+if ($hasOrderSourcesTable) {
+    $orderImportSuccess = (int)($results['orders']['import']['success_count'] ?? 0);
+    if ($orderImportSuccess > 0 && (int)$counts['ys_order_sources'] < $orderImportSuccess) {
+        fwrite(STDERR, "Order source table was not populated for Woo order imports.\n");
+        exit(1);
+    }
+}
+
 function run_job_until_done(JobRunner $runner, JobRepository $repo, int $jobId): array
 {
     $last = [];
@@ -128,3 +139,8 @@ function run_job_until_done(JobRunner $runner, JobRepository $repo, int $jobId):
     return $last;
 }
 
+function table_exists(string $table): bool
+{
+    global $wpdb;
+    return (string)$wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table)) === $table;
+}

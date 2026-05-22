@@ -12,8 +12,10 @@ $tests = [
     'static/plugin-boot-guards.php',
     'static/admin-slug-independence.php',
     'static/admin-user-role-guard.php',
+    'static/order-source-integration.php',
     'unit/status-mapper.php',
     'unit/package-validator.php',
+    'unit/order-source-repository.php',
 ];
 
 $failures = 0;
