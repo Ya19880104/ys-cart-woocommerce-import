@@ -179,26 +179,56 @@ final class CustomerImporter
             $baseLogin = 'ys-wc-imported';
         }
 
-        $candidate = $baseLogin;
-        $i = 1;
-        while (username_exists($candidate)) {
-            $candidate = $baseLogin . '-' . $i;
-            $i++;
+        $lastError = null;
+        $suffix = 0;
+        for ($attempt = 0; $attempt < 20; $attempt++) {
+            $candidate = $this->loginCandidate($baseLogin, $suffix);
+            while (username_exists($candidate)) {
+                $suffix++;
+                $candidate = $this->loginCandidate($baseLogin, $suffix);
+            }
+
+            $userId = wp_insert_user([
+                'user_login' => $candidate,
+                'user_email' => $email,
+                'display_name' => $displayName !== '' ? $displayName : $email,
+                'user_pass' => wp_generate_password(32, true, true),
+                'role' => get_role('customer') ? 'customer' : 'subscriber',
+            ]);
+
+            if (!is_wp_error($userId)) {
+                update_user_meta((int)$userId, '_ys_wc_imported_user', 1);
+                return (int)$userId;
+            }
+
+            $lastError = $userId;
+            $existingByEmail = email_exists($email);
+            if ($existingByEmail) {
+                return (int)$existingByEmail;
+            }
+
+            $code = method_exists($userId, 'get_error_code') ? (string)$userId->get_error_code() : '';
+            $message = method_exists($userId, 'get_error_message') ? (string)$userId->get_error_message() : '';
+            if (!in_array($code, ['existing_user_login', 'existing_user_email'], true)
+                && stripos($message, 'user') === false
+                && strpos($message, '使用者') === false
+                && strpos($message, '電子郵件') === false) {
+                break;
+            }
+
+            $suffix++;
         }
 
-        $userId = wp_insert_user([
-            'user_login' => $candidate,
-            'user_email' => $email,
-            'display_name' => $displayName !== '' ? $displayName : $email,
-            'user_pass' => wp_generate_password(32, true, true),
-            'role' => get_role('customer') ? 'customer' : 'subscriber',
-        ]);
+        $message = $lastError && method_exists($lastError, 'get_error_message')
+            ? (string)$lastError->get_error_message()
+            : 'Unable to create WordPress user for imported customer.';
+        throw new \RuntimeException($message);
+    }
 
-        if (is_wp_error($userId)) {
-            throw new \RuntimeException($userId->get_error_message());
-        }
-
-        update_user_meta((int)$userId, '_ys_wc_imported_user', 1);
-        return (int)$userId;
+    private function loginCandidate(string $baseLogin, int $suffix): string
+    {
+        $suffixText = $suffix > 0 ? '-' . $suffix : '';
+        $maxBaseLength = max(1, 60 - strlen($suffixText));
+        return substr($baseLogin, 0, $maxBaseLength) . $suffixText;
     }
 }

@@ -16,6 +16,7 @@ $tests = [
     'unit/status-mapper.php',
     'unit/package-validator.php',
     'unit/order-source-repository.php',
+    'unit/customer-importer-user-retry.php',
 ];
 
 $failures = 0;
