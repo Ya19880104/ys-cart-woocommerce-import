@@ -34,6 +34,12 @@ The UI calls REST routes under:
 
 `/wp-json/ys-cart-wc-import/v1`
 
+## Documentation
+
+- User import walkthrough: `docs/user-import-flow.md`
+- AI/MCP assistant contract draft: `docs/ai-mcp-skill-contract.md`
+- Reserved AI skill draft: `docs/mcp-skills/ys-cart-woocommerce-import-assistant/SKILL.md`
+
 ## Verification
 
 Run:
@@ -42,4 +48,3 @@ Run:
 php tests/run-static.php
 Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 ```
-
