@@ -70,7 +70,9 @@ final class RestController
         register_rest_route(self::NAMESPACE, '/jobs/(?P<id>\d+)/download', [
             'methods' => 'GET',
             'callback' => [new JobController(), 'download'],
-            'permission_callback' => [Permission::class, 'admin'],
+            // v0.2.4 Reviewer #3 fix: GET endpoint 改用 adminDownload (要求 nonce-query-arg)
+            // 防 CSRF — `<iframe src="/.../download">` 借 admin session 觸發 readfile()
+            'permission_callback' => [Permission::class, 'adminDownload'],
         ]);
 
         register_rest_route(self::NAMESPACE, '/packages/upload', [

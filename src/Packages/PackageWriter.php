@@ -79,7 +79,11 @@ final class PackageWriter
         }
 
         $base = $this->workingDir($packageId);
-        $zipPath = $this->dir . '/' . $packageId . '.zip';
+        // v0.2.4 path traversal fix (Reviewer #5):
+        // 原 zip path 直接拼 $packageId、未 sanitize。createImportJob/createDirectJob 都接受
+        // caller-controlled $options['package_id']、若送 "../../../tmp/evil" 會寫到 upload dir
+        // 外。對齊 resetPackage()/workingDir() 既有 safePackageId() 使用慣例。
+        $zipPath = $this->dir . '/' . $this->safePackageId($packageId) . '.zip';
         $zip = new ZipArchive();
 
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {

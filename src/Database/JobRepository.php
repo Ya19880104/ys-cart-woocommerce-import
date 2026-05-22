@@ -47,12 +47,37 @@ final class JobRepository
         )) ?: [];
     }
 
-    public function markRunning(int $id): void
+    /**
+     * Atomic transition pending → running.
+     *
+     * v0.2.4 fix (Reviewer #10):
+     * 原 update() 無 WHERE status='pending'、若 cron + AS 同時觸發、兩 thread 都看到 pending
+     * 都 flip 到 running、雙重 dispatch() 同 offset window → 重複 import 同筆訂單。
+     *
+     * Fix: 直接 SQL UPDATE 加 status='pending' 條件、check rows_affected==1 判斷是否真的
+     * 由本 thread 拿到 lock。Return bool 讓 caller 決定是否繼續 dispatch。
+     *
+     * BC: 原 method 是 void、改 bool。Caller (JobRunner::runNext) 已會 check job status 後
+     * 再 dispatch、即使忽略 return value 也只造成短暫的 status 跳一下、不影響 idempotency
+     * (因為 atomic UPDATE 仍只有一個 thread 能成功 flip)。
+     *
+     * @return bool true 若成功拿到 lock（rows_affected=1）、false 若已被其他 thread 搶走
+     */
+    public function markRunning(int $id): bool
     {
-        $this->update($id, [
-            'status' => 'running',
-            'started_at' => current_time('mysql'),
-        ]);
+        global $wpdb;
+        $table = TableMaker::jobsTable();
+        $now = current_time('mysql');
+        $result = $wpdb->query($wpdb->prepare(
+            "UPDATE {$table}
+             SET status = 'running', started_at = %s, updated_at = %s
+             WHERE id = %d AND status = 'pending'",
+            $now,
+            $now,
+            $id
+        ));
+        // false on DB error、0 on no-match (already running/done)、1 on success
+        return $result === 1;
     }
 
     public function updateProgress(int $id, array $patch): void

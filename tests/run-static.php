@@ -15,6 +15,7 @@ $tests = [
     'static/order-source-integration.php',
     'static/customer-export-excludes-imported-users.php',
     'static/order-existing-shipping-backfill.php',
+    'static/security-hardening-v024.php',
     'unit/status-mapper.php',
     'unit/package-validator.php',
     'unit/order-source-repository.php',
