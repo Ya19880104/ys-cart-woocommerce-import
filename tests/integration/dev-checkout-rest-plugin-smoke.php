@@ -107,7 +107,7 @@ function rest_request(string $method, string $route, array $params = []): array
     }
 
     $response = rest_do_request($request);
-    $data = rest_get_server()->response_to_data($response, false);
+    $data = json_decode(wp_json_encode(rest_get_server()->response_to_data($response, false)), true);
 
     return [
         'status' => $response->get_status(),
@@ -149,4 +149,3 @@ function summarize_job_response(array $response): array
         'file_exists' => !empty($data['file_path']) && is_file((string)$data['file_path']),
     ];
 }
-
