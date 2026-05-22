@@ -110,6 +110,46 @@ final class OrderSourceRepository
         ));
     }
 
+    /**
+     * GDPR cascade — delete source row(s) for a deleted YS order.
+     *
+     * Listener for `ys_ec_order_deleted` (ys-cart core ≥ 2.45.43). Cleans
+     * `ys_ec_order_sources` rows whose `order_id` matches, removing
+     * source_meta JSON PII (billing_email) imported from Woo.
+     *
+     * @param int $orderId YS order_id that was just hard-deleted.
+     * @return int Number of source rows removed (0 if no source row exists).
+     *
+     * @since 0.2.3 (ys-cart core ≥ 2.45.43)
+     */
+    public function deleteByYsOrderId(int $orderId): int
+    {
+        if ($orderId <= 0 || !$this->tableExists()) {
+            return 0;
+        }
+
+        global $wpdb;
+        $deleted = $wpdb->delete($this->table(), ['order_id' => $orderId], ['%d']);
+        return is_int($deleted) ? $deleted : 0;
+    }
+
+    /**
+     * Action hook handler — wired on `ys_ec_order_deleted` (priority 10).
+     *
+     * Static façade for easier add_action() wiring from plugin bootstrap
+     * (avoids needing to instantiate the repo in the hook listener).
+     *
+     * @param int    $orderId  YS order_id (passed by core).
+     * @param string $context  Trigger context (passed by core).
+     */
+    public static function onOrderDeleted(int $orderId, string $context = 'manual'): void
+    {
+        (new self())->deleteByYsOrderId($orderId);
+        // 註：silent — failure to clean source row 不 abort core delete flow
+        // (e.g. core 2.45.42 已先把 ys_ec_orders row 刪了)。
+        // Log 失敗會 spam、source row 殘留比 import flow 中斷可接受。
+    }
+
     private function tableExists(): bool
     {
         if (self::$tableExists !== null) {
