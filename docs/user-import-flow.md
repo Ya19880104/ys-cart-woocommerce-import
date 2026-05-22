@@ -73,6 +73,7 @@
 - 地址會用 YS CART 目前欄位格式合併。
 - 不要求品項一定要綁定真實商品。
 - 找不到商品對應時，會使用隱藏 placeholder 商品 `WooCommerce Imported Item`。
+- 若新版 YS CART 提供 `ys_ec_order_sources` 來源訂單表，外掛會自動寫入 WooCommerce 舊訂單 ID 與舊訂單編號，用於防止重複匯入，並保留給 YS CART 的開關式查詢/顯示功能使用。
 
 ## 商品匯入注意事項
 
