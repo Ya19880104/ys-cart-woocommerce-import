@@ -17,7 +17,16 @@ final class OrderExporter
         }
 
         $page = max(1, (int)($cursor['page'] ?? 1));
+        $alreadyProcessed = (int)($cursor['processed'] ?? 0);
+        $maxTotal = max(0, (int)($options['max_total'] ?? 0));
+        if ($maxTotal > 0 && $alreadyProcessed >= $maxTotal) {
+            return ['done' => true, 'processed' => 0];
+        }
+
         $limit = max(1, min(100, (int)($limits['max_rows'] ?? 50)));
+        if ($maxTotal > 0) {
+            $limit = min($limit, $maxTotal - $alreadyProcessed);
+        }
         $packageId = $options['package_id'] ?? ('job-' . $jobId);
 
         $ids = wc_get_orders([
@@ -44,16 +53,16 @@ final class OrderExporter
         $done = $processed < $limit;
         $repo = new JobRepository();
         $repo->updateProgress($jobId, [
-            'processed_count' => ((int)($cursor['processed'] ?? 0)) + $processed,
+            'processed_count' => $alreadyProcessed + $processed,
             'success_count' => ((int)($cursor['success'] ?? 0)) + $processed,
         ]);
         $repo->updateCursor($jobId, [
             'page' => $page + 1,
-            'processed' => ((int)($cursor['processed'] ?? 0)) + $processed,
+            'processed' => $alreadyProcessed + $processed,
             'success' => ((int)($cursor['success'] ?? 0)) + $processed,
         ]);
 
-        return ['done' => $done, 'processed' => $processed];
+        return ['done' => $done || ($maxTotal > 0 && $alreadyProcessed + $processed >= $maxTotal), 'processed' => $processed];
     }
 
     private function serializeOrder($order): array
@@ -153,4 +162,3 @@ final class OrderExporter
         return $date && method_exists($date, 'date') ? $date->date(DATE_ATOM) : '';
     }
 }
-
