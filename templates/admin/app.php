@@ -1,9 +1,20 @@
 <?php
 defined('ABSPATH') || exit;
+
+$licenseState = \YangSheep\YsCartWooImport\Licensing\LicenseState::publicState();
 ?>
 <div class="wrap ys-cwci-admin">
     <h1><?php echo esc_html__('YS CART WooCommerce Import', 'ys-cart-woocommerce-import'); ?></h1>
     <div id="ys-cwci-app" class="ys-cwci-shell">
+        <section id="ys-cwci-license" class="ys-cwci-panel">
+            <h2><?php echo esc_html__('License', 'ys-cart-woocommerce-import'); ?></h2>
+            <p>
+                <strong><?php echo esc_html__('Status:', 'ys-cart-woocommerce-import'); ?></strong>
+                <?php echo esc_html((string)$licenseState['status']); ?>
+            </p>
+            <p><?php echo esc_html__('This add-on keeps a local, page-load license reminder until official activation is connected.', 'ys-cart-woocommerce-import'); ?></p>
+        </section>
+
         <section class="ys-cwci-panel">
             <h2><?php echo esc_html__('Capabilities', 'ys-cart-woocommerce-import'); ?></h2>
             <pre data-ys-cwci-capabilities><?php echo esc_html__('Loading...', 'ys-cart-woocommerce-import'); ?></pre>

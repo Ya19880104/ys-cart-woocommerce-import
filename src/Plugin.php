@@ -6,6 +6,7 @@ namespace YangSheep\YsCartWooImport;
 defined('ABSPATH') || exit;
 
 use YangSheep\YsCartWooImport\Admin\AdminPage;
+use YangSheep\YsCartWooImport\Admin\LicenseNag;
 use YangSheep\YsCartWooImport\Jobs\JobRunner;
 use YangSheep\YsCartWooImport\Jobs\Scheduler;
 use YangSheep\YsCartWooImport\Rest\RestController;
@@ -32,10 +33,13 @@ final class Plugin
 
         $this->initialized = true;
 
+        $licenseNag = new LicenseNag();
+
         add_action('admin_menu', [new AdminPage(), 'register'], 30);
         add_action('admin_enqueue_scripts', [new AdminPage(), 'enqueue']);
+        add_action('admin_enqueue_scripts', [$licenseNag, 'enqueue']);
+        add_action('admin_footer', [$licenseNag, 'renderSeed']);
         add_action('rest_api_init', [new RestController(), 'registerRoutes']);
         add_action(Scheduler::HOOK_RUN_JOB, [new JobRunner(), 'runScheduledJob'], 10, 1);
     }
 }
-

@@ -1,0 +1,61 @@
+.ys-cwci-license-nag {
+    position: fixed;
+    inset: 0;
+    z-index: 100300;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(12, 18, 31, 0.42);
+}
+
+.ys-cwci-license-nag__panel {
+    position: relative;
+    width: min(520px, 100%);
+    padding: 28px;
+    border: 1px solid #d9e2ef;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+    color: #0f172a;
+}
+
+.ys-cwci-license-nag__panel h2 {
+    margin: 0 0 10px;
+    font-size: 20px;
+    line-height: 1.35;
+}
+
+.ys-cwci-license-nag__panel p {
+    margin: 0 0 16px;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.ys-cwci-license-nag__meta {
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #f1f5f9;
+    color: #475569;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.ys-cwci-license-nag__close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 34px;
+    height: 34px;
+    border: 1px solid #d9e2ef;
+    border-radius: 50%;
+    background: #fff;
+    color: #334155;
+    cursor: pointer;
+}
+
+.ys-cwci-license-nag__close:hover,
+.ys-cwci-license-nag__close:focus {
+    border-color: #2563eb;
+    color: #1d4ed8;
+    outline: none;
+}
