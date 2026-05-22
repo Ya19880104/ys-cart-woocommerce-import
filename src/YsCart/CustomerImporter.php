@@ -78,7 +78,7 @@ final class CustomerImporter
 
         $userId = $this->ensureUser($email, (string)($record['display_name'] ?? ''), (string)($record['login'] ?? ''));
         $class = self::YS_CUSTOMER;
-        $customerId = $class::convert_wp_user($userId);
+        $customerId = $this->ensureYsCustomerForUser($userId, $record);
 
         if (!$customerId) {
             throw new \RuntimeException('Unable to create YS CART customer.');
@@ -99,6 +99,48 @@ final class CustomerImporter
         );
 
         return (int)$customerId;
+    }
+
+    private function ensureYsCustomerForUser(int $userId, array $record): int
+    {
+        $class = self::YS_CUSTOMER;
+
+        if (user_can($userId, 'manage_options')) {
+            $this->removeRestrictedRoleFromPrivilegedUser($userId);
+
+            $existing = method_exists($class, 'find_by_user_id') ? $class::find_by_user_id($userId) : null;
+            if ($existing) {
+                return (int)$existing->id;
+            }
+
+            $existingByEmail = method_exists($class, 'find_by_email')
+                ? $class::find_by_email(strtolower((string)($record['email'] ?? '')))
+                : null;
+            if ($existingByEmail) {
+                return (int)$existingByEmail->id;
+            }
+
+            $data = CustomerMapper::mapCustomer($record, $userId);
+            if (method_exists($class, 'generate_member_no')) {
+                $data['member_no'] = $class::generate_member_no();
+            }
+
+            return (int)$class::create($data);
+        }
+
+        return (int)$class::convert_wp_user($userId);
+    }
+
+    private function removeRestrictedRoleFromPrivilegedUser(int $userId): void
+    {
+        if (!user_can($userId, 'manage_options')) {
+            return;
+        }
+
+        $user = get_user_by('id', $userId);
+        if ($user instanceof \WP_User && in_array('ys_ec_customer', (array)$user->roles, true)) {
+            $user->remove_role('ys_ec_customer');
+        }
     }
 
     public function ensureCustomerForEmail(int $jobId, string $fingerprint, string $email, array $source = []): array

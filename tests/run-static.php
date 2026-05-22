@@ -10,6 +10,7 @@ $tests = [
     'static/rest-permissions.php',
     'static/woo-order-query.php',
     'static/plugin-boot-guards.php',
+    'static/admin-user-role-guard.php',
     'unit/status-mapper.php',
     'unit/package-validator.php',
 ];
