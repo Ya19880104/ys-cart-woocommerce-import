@@ -13,10 +13,12 @@ $tests = [
     'static/admin-slug-independence.php',
     'static/admin-user-role-guard.php',
     'static/order-source-integration.php',
+    'static/customer-export-excludes-imported-users.php',
     'unit/status-mapper.php',
     'unit/package-validator.php',
     'unit/order-source-repository.php',
     'unit/customer-importer-user-retry.php',
+    'unit/package-writer-reset.php',
 ];
 
 $failures = 0;

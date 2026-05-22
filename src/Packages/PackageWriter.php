@@ -57,6 +57,21 @@ final class PackageWriter
         }
     }
 
+    public function resetPackage(string $packageId): void
+    {
+        $base = $this->workingDir($packageId);
+        foreach (glob($base . '/*') ?: [] as $file) {
+            if (is_file($file) && !unlink($file)) {
+                throw new RuntimeException('Unable to reset package working file.');
+            }
+        }
+
+        $zipPath = $this->dir . '/' . $this->safePackageId($packageId) . '.zip';
+        if (is_file($zipPath) && !unlink($zipPath)) {
+            throw new RuntimeException('Unable to reset package zip.');
+        }
+    }
+
     public function zip(string $packageId): string
     {
         if (!class_exists(ZipArchive::class)) {
@@ -88,7 +103,7 @@ final class PackageWriter
 
     private function workingDir(string $packageId): string
     {
-        $safe = preg_replace('/[^A-Za-z0-9_-]/', '', $packageId) ?: wp_generate_uuid4();
+        $safe = $this->safePackageId($packageId);
         $path = $this->dir . '/' . $safe;
 
         if (!is_dir($path) && !wp_mkdir_p($path)) {
@@ -96,5 +111,10 @@ final class PackageWriter
         }
 
         return $path;
+    }
+
+    private function safePackageId(string $packageId): string
+    {
+        return preg_replace('/[^A-Za-z0-9_-]/', '', $packageId) ?: wp_generate_uuid4();
     }
 }

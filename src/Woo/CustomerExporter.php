@@ -31,6 +31,12 @@ final class CustomerExporter
 
         $query = new \WP_User_Query([
             'role__in' => ['customer', 'subscriber'],
+            'meta_query' => [
+                [
+                    'key' => '_ys_wc_imported_user',
+                    'compare' => 'NOT EXISTS',
+                ],
+            ],
             'number' => $limit,
             'paged' => $page,
             'orderby' => 'ID',

@@ -134,6 +134,12 @@ function source_counts(): array
 
     $userQuery = new WP_User_Query([
         'role__in' => ['customer', 'subscriber'],
+        'meta_query' => [
+            [
+                'key' => '_ys_wc_imported_user',
+                'compare' => 'NOT EXISTS',
+            ],
+        ],
         'number' => 1,
         'fields' => 'ID',
         'count_total' => true,

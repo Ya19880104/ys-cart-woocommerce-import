@@ -35,9 +35,15 @@ final class JobRunner
         }
 
         try {
+            $started = false;
             if ($job->status === 'pending') {
                 $repo->markRunning($jobId);
                 $job = $repo->find($jobId);
+                $started = true;
+            }
+
+            if ($started && $job && $job->type === 'export') {
+                $this->resetExportPackage($job);
             }
 
             $result = $this->dispatch($job);
@@ -85,6 +91,13 @@ final class JobRunner
         }
 
         return ['done' => true, 'message' => 'Unsupported job type.'];
+    }
+
+    private function resetExportPackage(object $job): void
+    {
+        $options = json_decode((string)$job->options_json, true) ?: [];
+        $packageId = (string)($options['package_id'] ?? ('job-' . (int)$job->id));
+        (new PackageWriter())->resetPackage($packageId);
     }
 
     private function finalizeExport(object $job): void
