@@ -85,6 +85,10 @@ final class OrderImporter
 
         $existingMap = $mapRepo->find($fingerprint, 'order', $sourceId);
         if ($existingMap) {
+            // v0.2.1 nit B1：legacy map backfill 不驗證 target_id 仍對應有效 YS order。
+            // 若該 YS order 已被人工刪除 / 屬於不同 fingerprint，upsertWooOrder 會碰到
+            // uk_order_platform unique constraint、$wpdb->query 回 false → silent ignore、
+            // import flow 不中斷。這是 race / 孤兒 map 的容忍策略、刻意不 throw。
             $orderSources->upsertWooOrder((int)$existingMap->target_id, $fingerprint, $record);
             return (int)$existingMap->target_id;
         }

@@ -48,6 +48,18 @@ final class OrderSourceRepository
         return $orderId ? (int)$orderId : null;
     }
 
+    /**
+     * Insert 一筆 source identity row（給剛 import 完成的 Woo order 用）。
+     *
+     * 用 INSERT ... ON DUPLICATE KEY UPDATE 對抗 uk_source_order 跟 uk_order_platform
+     * unique constraint、race-safe。
+     *
+     * **v0.2.1 nit B3 PII 注意**：source_meta 內含 billing_email（PII）。雖然 YS order
+     * 本身已存 email、不算二次洩漏、但 GDPR 刪除使用者訂單時需**一併清此表**對應 row、
+     * 否則 source_meta 會殘留 email。建議未來 YS core 提供 hook 讓 import plugin 在
+     * order 刪除時 cascade delete source row（或於 ys_ec_orders ON DELETE 之外用
+     * application-level 監聽 ys_ec_order_deleted action）。
+     */
     public function upsertWooOrder(int $orderId, string $fingerprint, array $record): void
     {
         if ($orderId <= 0 || !$this->tableExists()) {
@@ -127,13 +139,29 @@ final class OrderSourceRepository
         return bin2hex(self::fingerprintForStorage($fingerprint));
     }
 
+    /**
+     * Source-created-at 字串 → MySQL DATETIME。
+     *
+     * v0.2.1 nit B2 修正：之前 `strtotime($date)` 對無 tz 字串依賴 server tz、
+     * gmdate 又強制 UTC、parse 跟 output 不一致。改用 DateTimeImmutable + UTC
+     * fallback、無 tz 字串視同 UTC（manifest 慣例）、有 tz 字串保留語意。
+     *
+     * 用 wp_date 不適合（wp_date 是 site tz format 用、不是 normalize）；
+     * 我們要的是「source 時間語意保留、儲存統一 UTC」。
+     */
     private function mysqlDate(string $date): ?string
     {
         if ($date === '') {
             return null;
         }
 
-        $timestamp = strtotime($date);
-        return $timestamp ? gmdate('Y-m-d H:i:s', $timestamp) : null;
+        try {
+            // 沒帶 tz 的字串視同 UTC（避免 PHP server tz 飄移）
+            $dt = new \DateTimeImmutable($date, new \DateTimeZone('UTC'));
+            return $dt->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+        } catch (\Throwable $e) {
+            // Malformed date string → 保守 skip、不寫入垃圾 DATETIME
+            return null;
+        }
     }
 }
