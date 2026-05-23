@@ -11,6 +11,8 @@ $tests = [
     'static/woo-order-query.php',
     'static/plugin-boot-guards.php',
     'static/admin-slug-independence.php',
+    'static/admin-auto-run-flow.php',
+    'static/job-runner-lock.php',
     'static/admin-user-role-guard.php',
     'static/order-source-integration.php',
     'static/customer-export-excludes-imported-users.php',

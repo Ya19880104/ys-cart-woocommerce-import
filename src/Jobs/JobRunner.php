@@ -34,6 +34,18 @@ final class JobRunner
             return ['status' => 'missing'];
         }
 
+        if (in_array((string)$job->status, ['completed', 'failed', 'cancelled'], true)) {
+            return ['done' => true, 'status' => (string)$job->status];
+        }
+
+        if (!$this->acquireJobLock($jobId)) {
+            return [
+                'done' => false,
+                'status' => 'locked',
+                'message' => 'Job is already being processed.',
+            ];
+        }
+
         try {
             $started = false;
             if ($job->status === 'pending') {
@@ -60,6 +72,8 @@ final class JobRunner
         } catch (Throwable $e) {
             $repo->fail($jobId, $e->getMessage());
             return ['status' => 'failed', 'message' => $e->getMessage()];
+        } finally {
+            $this->releaseJobLock($jobId);
         }
     }
 
@@ -135,5 +149,33 @@ final class JobRunner
 
         $zipPath = $writer->zip($packageId);
         (new JobRepository())->attachFile((int)$job->id, $zipPath);
+    }
+
+    private function acquireJobLock(int $jobId): bool
+    {
+        $key = $this->lockKey($jobId);
+        $expiresAt = (string)(time() + self::MAX_SECONDS + 45);
+
+        if (add_option($key, $expiresAt, '', 'no')) {
+            return true;
+        }
+
+        $existing = (int)get_option($key);
+        if ($existing > 0 && $existing < time()) {
+            delete_option($key);
+            return add_option($key, $expiresAt, '', 'no');
+        }
+
+        return false;
+    }
+
+    private function releaseJobLock(int $jobId): void
+    {
+        delete_option($this->lockKey($jobId));
+    }
+
+    private function lockKey(int $jobId): string
+    {
+        return 'ys_cwci_job_lock_' . $jobId;
     }
 }

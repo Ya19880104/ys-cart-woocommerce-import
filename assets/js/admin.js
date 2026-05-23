@@ -279,9 +279,15 @@
             api('/ys-cart-wc-import/v1/export-jobs', {
                 method: 'POST',
                 data: { entity, options: {} }
-            }).then(() => {
-                setStatus(`${entityLabels[entity] || entity} 匯出工作已建立`);
-                return loadJobs();
+            }).then((job) => {
+                const jobId = Number(job?.id || 0);
+                setStatus(`${entityLabels[entity] || entity} 匯出工作已建立，開始自動執行`);
+                return loadJobs().then(() => {
+                    if (jobId > 0) {
+                        return autoRun(jobId, exportButton);
+                    }
+                    return undefined;
+                });
             }).catch((error) => {
                 setStatus(error.message || '建立匯出工作失敗');
             }).finally(() => {
@@ -352,9 +358,15 @@
                         }
                     });
                 })
-                .then(() => {
-                    setStatus(`${entityLabels[entity] || entity} 匯入工作已建立`);
-                    return loadJobs();
+                .then((job) => {
+                    const jobId = Number(job?.id || 0);
+                    setStatus(`${entityLabels[entity] || entity} 匯入工作已建立，開始自動執行`);
+                    return loadJobs().then(() => {
+                        if (jobId > 0) {
+                            return autoRun(jobId, submitButton);
+                        }
+                        return undefined;
+                    });
                 })
                 .catch((error) => {
                     if (uploadResult) {
