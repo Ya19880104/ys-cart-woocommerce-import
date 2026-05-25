@@ -15,8 +15,8 @@ final class AdminPage
         if (class_exists(self::YS_ADMIN_APP)) {
             add_submenu_page(
                 'ys-cart',
-                __('WooCommerce Import', 'ys-cart-woocommerce-import'),
-                __('WooCommerce Import', 'ys-cart-woocommerce-import'),
+                __('WooCommerce 匯入', 'ys-cart-woocommerce-import'),
+                __('WooCommerce 匯入', 'ys-cart-woocommerce-import'),
                 'manage_options',
                 self::SLUG,
                 [$this, 'render']
@@ -25,8 +25,8 @@ final class AdminPage
         }
 
         add_management_page(
-            __('YS CART Woo Import', 'ys-cart-woocommerce-import'),
-            __('YS CART Woo Import', 'ys-cart-woocommerce-import'),
+            __('YS CART Woo 匯入', 'ys-cart-woocommerce-import'),
+            __('YS CART Woo 匯入', 'ys-cart-woocommerce-import'),
             'manage_options',
             self::SLUG,
             [$this, 'render']

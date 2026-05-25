@@ -25,7 +25,7 @@ foreach ([
     "'slug' => 'ys-cart-woocommerce-import'",
     "'version' => YS_CWCI_VERSION",
     "'plugin_file' => __FILE__",
-    "'name' => 'YS CART WooCommerce Import'",
+    "'name' => 'YS CART WooCommerce 匯入工具'",
     '}, 5);',
 ] as $needle) {
     if (strpos($main, $needle) === false) {

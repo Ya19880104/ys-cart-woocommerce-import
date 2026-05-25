@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name: YS CART WooCommerce Import
+ * Plugin Name: YS CART WooCommerce 匯入工具
  * Plugin URI:  https://yangsheep.com.tw
- * Description: Standalone WooCommerce export and YS CART import bridge with resumable REST-driven jobs.
- * Version:     0.3.3
+ * Description: WooCommerce 客戶、商品與訂單移轉到 YS CART 的匯出匯入工具，支援可續跑 REST 批次工作。
+ * Version:     0.3.4
  * Author:      YANGSHEEP DESIGN
  * Author URI:  https://yangsheep.com.tw
  * License:     GPL-2.0-or-later
@@ -17,7 +17,7 @@
 
 defined('ABSPATH') || exit;
 
-define('YS_CWCI_VERSION', '0.3.3');
+define('YS_CWCI_VERSION', '0.3.4');
 define('YS_CWCI_PLUGIN_FILE', __FILE__);
 define('YS_CWCI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('YS_CWCI_PLUGIN_URL', plugin_dir_url(__FILE__));
@@ -63,7 +63,7 @@ add_action('plugins_loaded', static function (): void {
             'slug' => 'ys-cart-woocommerce-import',
             'version' => YS_CWCI_VERSION,
             'plugin_file' => __FILE__,
-            'name' => 'YS CART WooCommerce Import',
+            'name' => 'YS CART WooCommerce 匯入工具',
         ]);
     }
 }, 5);

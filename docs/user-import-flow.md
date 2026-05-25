@@ -1,4 +1,4 @@
-# YS CART WooCommerce Import 使用者匯入流程
+# YS CART WooCommerce 匯入工具使用者流程
 
 更新日期：2026-05-22
 
@@ -8,9 +8,9 @@
 
 在 WordPress 後台開啟：
 
-`Tools > YS CART Woo Import`
+`工具 > YS CART Woo 匯入`
 
-頁面會先顯示 `Capabilities`：
+頁面會先顯示「目前網站 / 移轉狀態」：
 
 - `woocommerce: true` 代表此站可匯出 WooCommerce 資料。
 - `ys_cart: true` 代表此站可匯入 YS CART 資料。
@@ -20,10 +20,10 @@
 
 在來源網站操作：
 
-1. 點選 `Export Customers`、`Export Products` 或 `Export Orders`。
-2. 下方 `Jobs` 會新增一筆 `export/<entity>` job。
-3. 點該 job 的 `Run Next`。
-4. 狀態變成 `completed` 後，點 `Download` 下載 ZIP 套件。
+1. 點選「匯出客戶」、「匯出商品」或「匯出訂單」。
+2. 下方「工作狀態」會新增一筆 `export/<entity>` job。
+3. 介面會自動執行批次；需要手動重試時，可點該 job 的「執行下一批」。
+4. 狀態變成 `completed` 後，點「下載」下載 ZIP 套件。
 
 套件內容是 JSONL-based ZIP，包含 manifest 與對應 entity 檔案。訂單、商品、客戶可分開匯出，方便在不同網站分階段匯入。
 
@@ -31,29 +31,29 @@
 
 在目標網站操作：
 
-1. 開啟 `Tools > YS CART Woo Import`。
-2. 在 `Import to YS CART` 區塊選擇 ZIP 套件。
-3. 選擇 entity：`Customers`、`Products` 或 `Orders`。
-4. 點 `Upload and Import`。
-5. 上傳成功後會顯示 manifest，並在 `Jobs` 新增 `import/<entity>` job。
-6. 點 `Run Next` 執行批次。
-7. 若狀態還不是 `completed`，繼續點 `Run Next`，直到完成。
+1. 開啟 `工具 > YS CART Woo 匯入`。
+2. 在「匯入到 YS CART」區塊選擇 ZIP 套件。
+3. 選擇資料類型：「客戶」、「商品」或「訂單」。
+4. 點「上傳並匯入」。
+5. 上傳成功後會顯示 manifest，並在「工作狀態」新增 `import/<entity>` job。
+6. 介面會自動執行批次；需要手動重試時，可點「執行下一批」。
+7. 若狀態還不是 `completed`，繼續使用「自動執行」或「執行下一批」，直到完成。
 
-目前 UI 是手動批次執行，這樣能避免低階主機因單次匯入過大而 timeout。未來可以在此基礎上加自動輪詢，但仍應保留手動重試能力。
+目前 UI 使用 REST 小批次執行並支援自動續跑，避免低階主機因單次匯入過大而 timeout；同時保留手動重試能力。
 
 ## 匯入順序建議
 
 跨站移轉建議順序：
 
-1. `Customers`
-2. `Products`
-3. `Orders`
+1. `customers` 客戶
+2. `products` 商品
+3. `orders` 訂單
 
 原因：
 
-- Customers 先匯入可讓訂單有機會對應到既有或新建使用者。
-- Products 先匯入可讓訂單品項盡可能對應到商品 map。
-- Orders 最後匯入，若找不到商品 map，外掛會建立隱藏 placeholder 商品，確保訂單查詢資訊仍保留。
+- 客戶先匯入可讓訂單有機會對應到既有或新建使用者。
+- 商品先匯入可讓訂單品項盡可能對應到商品 map。
+- 訂單最後匯入，若找不到商品 map，外掛會建立隱藏 placeholder 商品，確保訂單查詢資訊仍保留。
 
 ## 客戶與使用者注意事項
 
@@ -101,10 +101,10 @@
 
 1. 用外掛 REST job 產生小型 Woo orders ZIP，限制 2 筆，避免對 10k+ Woo orders 造成壓力。
 2. 用瀏覽器登入 WordPress 後台。
-3. 開啟 `Tools > YS CART Woo Import`。
+3. 開啟 `工具 > YS CART Woo 匯入`。
 4. 在 UI 上傳 orders ZIP。
 5. UI 建立 `import/orders` job。
-6. 點 `Run Next` 完成匯入。
+6. 點「執行下一批」或「自動執行」完成匯入。
 
 結果：
 
@@ -146,7 +146,7 @@
 
 ### 匯入中斷
 
-重新進入頁面後，找到同一筆 job，再按 `Run Next`。job cursor 會保存進度。
+重新進入頁面後，找到同一筆 job，再按「自動執行」或「執行下一批」。job cursor 會保存進度。
 
 ### 訂單商品沒有對上
 

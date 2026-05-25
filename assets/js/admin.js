@@ -16,10 +16,17 @@
     let autoRunningJobId = null;
 
     const entityLabels = {
-        customers: 'Customers',
-        products: 'Products',
-        orders: 'Orders',
-        all: 'All'
+        customers: '客戶',
+        products: '商品',
+        orders: '訂單',
+        all: '全部'
+    };
+
+    const typeLabels = {
+        export: '匯出',
+        import: '匯入',
+        direct: '直接移轉',
+        job: '工作'
     };
 
     const statusLabels = {
@@ -88,7 +95,7 @@
             },
             {
                 key: 'can_direct_transfer',
-                label: 'Direct Transfer',
+                label: '同站直接移轉',
                 enabled: !!data.can_direct_transfer,
                 ok: '同站可直接轉換',
                 missing: '跨站請使用 ZIP 匯出/匯入'
@@ -121,7 +128,7 @@
             setStatus('狀態已更新');
         })
         .catch((error) => {
-            capabilities.innerHTML = `<div class="ys-cwci-alert is-error">${escapeHtml(error.message || 'Unable to load capabilities.')}</div>`;
+            capabilities.innerHTML = `<div class="ys-cwci-alert is-error">${escapeHtml(error.message || '無法讀取狀態。')}</div>`;
             setStatus('讀取狀態失敗');
         });
 
@@ -144,19 +151,19 @@
         jobs.innerHTML = items.map((job) => {
             const status = String(job.status || 'pending');
             const progress = progressOf(job);
-            const entity = entityLabels[job.entity] || job.entity || 'Unknown';
-            const type = job.type || 'job';
+            const entity = entityLabels[job.entity] || job.entity || '未知';
+            const type = typeLabels[job.type] || job.type || '工作';
             const processed = Number(job.processed_count || 0);
             const success = Number(job.success_count || 0);
             const errors = Number(job.error_count || 0);
             const active = !isTerminal(status);
             const download = job.file_name
                 ? `<a class="ysca-btn ysca-btn--ghost ysca-btn--sm" href="${escapeHtml(window.ysCwciAdmin.restUrl)}/jobs/${Number(job.id)}/download">
-                    <span class="dashicons dashicons-download" aria-hidden="true"></span>Download
+                    <span class="dashicons dashicons-download" aria-hidden="true"></span>下載
                 </a>`
                 : '';
             const errorButton = errors > 0
-                ? `<button type="button" class="ysca-btn ysca-btn--ghost ysca-btn--sm" data-ys-cwci-errors="${Number(job.id)}">Errors</button>`
+                ? `<button type="button" class="ysca-btn ysca-btn--ghost ysca-btn--sm" data-ys-cwci-errors="${Number(job.id)}">錯誤</button>`
                 : '';
 
             return `
@@ -168,20 +175,20 @@
                                 <span class="ysca-badge ysca-badge--${escapeHtml(status)}">${escapeHtml(statusLabels[status] || status)}</span>
                             </div>
                             <div class="ys-cwci-job__meta">
-                                <span>Processed ${processed}</span>
-                                <span>Success ${success}</span>
-                                <span class="${errors > 0 ? 'is-danger' : ''}">Errors ${errors}</span>
-                                <span>Updated ${escapeHtml(job.updated_at || '')}</span>
+                                <span>已處理 ${processed}</span>
+                                <span>成功 ${success}</span>
+                                <span class="${errors > 0 ? 'is-danger' : ''}">錯誤 ${errors}</span>
+                                <span>更新 ${escapeHtml(job.updated_at || '')}</span>
                             </div>
                         </div>
                         <div class="ys-cwci-job__actions">
                             ${download}
                             ${errorButton}
-                            <button type="button" class="ysca-btn ysca-btn--ghost ysca-btn--sm" data-ys-cwci-run="${Number(job.id)}" ${canRun(status) ? '' : 'disabled'}>Run Next</button>
-                            <button type="button" class="ysca-btn ysca-btn--primary ysca-btn--sm" data-ys-cwci-auto-run="${Number(job.id)}" ${canRun(status) ? '' : 'disabled'}>Auto Run</button>
+                            <button type="button" class="ysca-btn ysca-btn--ghost ysca-btn--sm" data-ys-cwci-run="${Number(job.id)}" ${canRun(status) ? '' : 'disabled'}>執行下一批</button>
+                            <button type="button" class="ysca-btn ysca-btn--primary ysca-btn--sm" data-ys-cwci-auto-run="${Number(job.id)}" ${canRun(status) ? '' : 'disabled'}>自動執行</button>
                         </div>
                     </div>
-                    <div class="ys-cwci-progress" aria-label="Job progress">
+                    <div class="ys-cwci-progress" aria-label="工作進度">
                         <span style="width:${progress}%"></span>
                     </div>
                     <div class="ys-cwci-job__details" data-ys-cwci-job-details="${Number(job.id)}" hidden></div>
@@ -196,7 +203,7 @@
             return items;
         })
         .catch((error) => {
-            jobs.innerHTML = `<div class="ys-cwci-alert is-error">${escapeHtml(error.message || 'Unable to load jobs.')}</div>`;
+            jobs.innerHTML = `<div class="ys-cwci-alert is-error">${escapeHtml(error.message || '無法讀取工作。')}</div>`;
             setStatus('讀取工作失敗');
             return [];
         });
@@ -255,8 +262,8 @@
             if (panel) {
                 panel.hidden = false;
                 panel.innerHTML = Array.isArray(errors) && errors.length
-                    ? errors.map((error) => `<div class="ys-cwci-error-line"><strong>${escapeHtml(error.entity || 'job')} ${escapeHtml(error.source_id || '')}</strong><span>${escapeHtml(error.message || '')}</span></div>`).join('')
-                    : '<div class="ys-cwci-error-line">No errors returned.</div>';
+                    ? errors.map((error) => `<div class="ys-cwci-error-line"><strong>${escapeHtml(entityLabels[error.entity] || error.entity || '工作')} ${escapeHtml(error.source_id || '')}</strong><span>${escapeHtml(error.message || '')}</span></div>`).join('')
+                    : '<div class="ys-cwci-error-line">沒有回傳錯誤內容。</div>';
             }
         } catch (error) {
             setStatus(error.message || `#${id} 讀取錯誤失敗`);
@@ -324,7 +331,7 @@
             setStatus('上傳套件並檢查 manifest');
             if (uploadResult) {
                 uploadResult.hidden = false;
-                uploadResult.textContent = 'Uploading...';
+                uploadResult.textContent = '上傳中...';
             }
 
             fetch(`${window.ysCwciAdmin.restUrl}/packages/upload`, {
@@ -336,13 +343,13 @@
                 .then((response) => response.json())
                 .then((packageInfo) => {
                     if (packageInfo.code) {
-                        throw new Error(packageInfo.message || 'Upload failed.');
+                        throw new Error(packageInfo.message || '上傳失敗。');
                     }
 
                     if (uploadResult) {
                         uploadResult.innerHTML = `
-                            <strong>Package ready</strong>
-                            <span>${escapeHtml(packageInfo.manifest?.entity || entity)} from ${escapeHtml(packageInfo.manifest?.source?.site_url || 'source site')}</span>
+                            <strong>套件已就緒</strong>
+                            <span>${escapeHtml(entityLabels[packageInfo.manifest?.entity] || packageInfo.manifest?.entity || entityLabels[entity] || entity)}，來源：${escapeHtml(packageInfo.manifest?.source?.site_url || '來源網站')}</span>
                         `;
                     }
 
@@ -370,7 +377,7 @@
                 })
                 .catch((error) => {
                     if (uploadResult) {
-                        uploadResult.textContent = error.message || 'Import failed.';
+                        uploadResult.textContent = error.message || '匯入失敗。';
                     }
                     setStatus(error.message || '匯入工作建立失敗');
                 })

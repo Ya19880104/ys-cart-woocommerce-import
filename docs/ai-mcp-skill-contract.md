@@ -211,7 +211,7 @@ Skill 必須遵守：
 
 - 正式 MCP server metadata。
 - Job progress streaming。
-- UI 自動輪詢但保留手動 `Run Next`。
+- UI 自動輪詢但保留手動「執行下一批」。
 - package preview 顯示 entity counts、來源站 hash、WooCommerce version、風險提示。
 - 匯入前 dry-run：顯示將建立/更新的 customers/products/orders 數量。
 - 跨站 user mapping 報告：列出已存在、會新建、email 衝突的使用者統計。

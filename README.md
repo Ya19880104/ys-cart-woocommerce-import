@@ -1,66 +1,65 @@
-# YS CART WooCommerce Import
+# YS CART WooCommerce 匯入工具
 
-Standalone WordPress plugin for exporting WooCommerce data and importing it into YS CART.
+獨立 WordPress 外掛，用於將 WooCommerce 客戶、商品與訂單匯出成可搬移套件，並匯入到 YS CART。
 
-## Modes
+## 使用模式
 
-- WooCommerce export: available when WooCommerce is active. YS CART is not required.
-- YS CART import: available when YS CART is active. WooCommerce is not required.
-- Direct transfer: reserved for sites that have both WooCommerce and YS CART active.
+- WooCommerce 匯出：來源站只要啟用 WooCommerce 即可，該站不需要安裝 YS CART。
+- YS CART 匯入：目標站只要啟用 YS CART 即可，該站不需要安裝 WooCommerce。
+- 同站直接移轉：保留給 WooCommerce 與 YS CART 都啟用的網站使用。
 
-## Current Scope
+## 目前範圍
 
-- Export WooCommerce customers, products, and orders into JSONL-based zip packages.
-- Import customers, products, variants, and orders into YS CART.
-- Import regular WooCommerce products in the general engine: simple products, variable products, attributes, and variations.
-- Keep subscription products out of the general product engine. Subscription products should be imported by a separate optional subscription engine.
-- Run migration work through REST-triggered jobs.
-- Use Action Scheduler when available and WP-Cron as fallback.
-- Keep the migration import/export workflow off WordPress admin request endpoints.
-- Register with the bundled YS Plugin Hub Client for YS Hub installation and update delivery.
+- 匯出 WooCommerce 客戶、商品與訂單為 JSONL-based ZIP 套件。
+- 匯入客戶、商品、多規格商品、變體與訂單到 YS CART。
+- 一般商品引擎支援簡單商品、多規格商品、屬性與變體。
+- 訂閱商品不放在一般商品引擎內，後續以獨立可選引擎處理。
+- 移轉工作透過 REST 小批次執行，可續跑並降低單次請求壓力。
+- 可使用 Action Scheduler；未安裝時使用 WP-Cron 作為備援。
+- 匯入/匯出流程不依賴 WordPress admin-ajax.php。
+- 內建 YS Plugin Hub Client，可透過 YS Hub 安裝與更新。
 
-## Important Mapping Rules
+## 重要對應規則
 
-- WooCommerce orders are read through `wc_get_orders()` for HPOS compatibility.
-- Cross-site missing users are auto-created with random passwords and `_ys_wc_imported_user = 1`.
-- Woo order items do not require real product binding. If no migrated product map exists, the importer creates a hidden placeholder product named `WooCommerce Imported Item`.
-- Woo order shipping lines preserve the shipping line name as `shipping_provider`. Woo `method_id` is not written into YS CART `shipping_method_id` because it is not a reliable YS shipping registry key.
-- Product matching uses source map, SKU, then slug.
-- Variable products create YS CART variable products plus variant rows.
+- WooCommerce 訂單使用 `wc_get_orders()` 讀取，以相容 HPOS。
+- 跨站匯入時若找不到使用者，會建立隨機密碼使用者並標記 `_ys_wc_imported_user = 1`。
+- Woo 訂單品項不強制綁定真實商品；若找不到商品 map，會建立隱藏 placeholder 商品 `WooCommerce Imported Item`。
+- Woo 訂單物流行保留物流名稱為 `shipping_provider`；不寫入 Woo `method_id` 到 YS CART `shipping_method_id`，避免誤對應。
+- 商品對應順序為來源 map、SKU、slug。
+- 多規格商品會建立 YS CART 變體商品與變體資料列。
 
-## Admin UI
+## 後台位置
 
-Open:
+YS CART 已安裝時：
 
-`電商系統 > WooCommerce Import`
+`電商系統 > WooCommerce 匯入`
 
-On WooCommerce-only export sites without YS CART, the fallback location is:
+只有 WooCommerce 的匯出站，備援位置為：
 
-`Tools > YS CART Woo Import`
+`工具 > YS CART Woo 匯入`
 
-The UI calls REST routes under:
+管理介面使用 REST 路由：
 
 `/wp-json/ys-cart-wc-import/v1`
 
-## Distribution
+## 上架與更新
 
-The plugin bundles `vendor/yangsheep/ys-plugin-hub-client` and registers itself with slug
-`ys-cart-woocommerce-import` during `plugins_loaded` priority `5`.
+外掛包含 `vendor/yangsheep/ys-plugin-hub-client`，並於 `plugins_loaded` priority `5` 註冊 slug：
 
-Release packages should include the tracked vendor Hub Client files and exclude local build
-artifacts, logs, temporary files, and generated zip files.
+`ys-cart-woocommerce-import`
 
-## Documentation
+發布套件需包含已追蹤的 Hub Client runtime 檔案，並排除本機建置產物、log、暫存檔與產生的 zip 檔。
 
-- User import walkthrough: `docs/user-import-flow.md`
-- AI/MCP assistant contract draft: `docs/ai-mcp-skill-contract.md`
-- Reserved AI skill draft: `docs/mcp-skills/ys-cart-woocommerce-import-assistant/SKILL.md`
+## 文件
 
-## Verification
+- 使用者匯入流程：`docs/user-import-flow.md`
+- AI/MCP 協助合約草稿：`docs/ai-mcp-skill-contract.md`
+- 預留 AI skill 草稿：`docs/mcp-skills/ys-cart-woocommerce-import-assistant/SKILL.md`
 
-Run:
+## 驗證
 
 ```bash
 php tests/run-static.php
+node --check assets/js/admin.js
 Get-ChildItem -Recurse -Filter *.php | ForEach-Object { php -l $_.FullName }
 ```
