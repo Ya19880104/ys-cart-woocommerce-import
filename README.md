@@ -30,11 +30,11 @@
 
 ## 後台位置
 
-YS CART 已安裝時：
+主要入口：
 
-`電商系統 > WooCommerce 匯入`
+`YS Plugin > WooCommerce 匯入`
 
-只有 WooCommerce 的匯出站，備援位置為：
+若 YS Plugin menu 尚未建立，備援位置為：
 
 `工具 > YS CART Woo 匯入`
 

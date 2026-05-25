@@ -8,13 +8,13 @@ defined('ABSPATH') || exit;
 final class AdminPage
 {
     public const SLUG = 'ys-ec-woo-import';
-    private const YS_ADMIN_APP = '\YangSheep\Ecommerce\Admin\YSAdminApp';
+    private const HUB_MENU_SLUG = 'ys-toolbox';
 
     public function register(): void
     {
-        if (class_exists(self::YS_ADMIN_APP)) {
+        if ($this->hubMenuExists()) {
             add_submenu_page(
-                'ys-cart',
+                self::HUB_MENU_SLUG,
                 __('WooCommerce 匯入', 'ys-cart-woocommerce-import'),
                 __('WooCommerce 匯入', 'ys-cart-woocommerce-import'),
                 'manage_options',
@@ -31,6 +31,23 @@ final class AdminPage
             self::SLUG,
             [$this, 'render']
         );
+    }
+
+    private function hubMenuExists(): bool
+    {
+        global $menu;
+
+        if (!is_array($menu)) {
+            return false;
+        }
+
+        foreach ($menu as $item) {
+            if (isset($item[2]) && self::HUB_MENU_SLUG === $item[2]) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function enqueue(string $hook): void

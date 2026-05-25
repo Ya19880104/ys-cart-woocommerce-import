@@ -1,18 +1,8 @@
 <?php
 defined('ABSPATH') || exit;
 
-$ysAdminApp = '\YangSheep\Ecommerce\Admin\YSAdminApp';
-$useYsShell = class_exists($ysAdminApp);
-
-if ($useYsShell) {
-    $ysAdminApp::open(
-        __('WooCommerce 匯入', 'ys-cart-woocommerce-import'),
-        __('電商系統 / WooCommerce 匯入', 'ys-cart-woocommerce-import')
-    );
-} else {
-    echo '<div class="wrap">';
-    echo '<h1>' . esc_html__('YS CART WooCommerce 匯入工具', 'ys-cart-woocommerce-import') . '</h1>';
-}
+echo '<div class="wrap">';
+echo '<h1>' . esc_html__('YS CART WooCommerce 匯入工具', 'ys-cart-woocommerce-import') . '</h1>';
 ?>
 <div class="ys-cwci-admin">
     <div id="ys-cwci-app" class="ys-cwci-shell">
@@ -104,10 +94,4 @@ if ($useYsShell) {
         </section>
     </div>
 </div>
-<?php
-if ($useYsShell) {
-    $ysAdminApp::close();
-} else {
-    echo '</div>';
-}
-?>
+<?php echo '</div>'; ?>

@@ -8,7 +8,7 @@
 
 在 WordPress 後台開啟：
 
-`工具 > YS CART Woo 匯入`
+`YS Plugin > WooCommerce 匯入`
 
 頁面會先顯示「目前網站 / 移轉狀態」：
 
@@ -31,7 +31,7 @@
 
 在目標網站操作：
 
-1. 開啟 `工具 > YS CART Woo 匯入`。
+1. 開啟 `YS Plugin > WooCommerce 匯入`。
 2. 在「匯入到 YS CART」區塊選擇 ZIP 套件。
 3. 選擇資料類型：「客戶」、「商品」或「訂單」。
 4. 點「上傳並匯入」。
@@ -101,7 +101,7 @@
 
 1. 用外掛 REST job 產生小型 Woo orders ZIP，限制 2 筆，避免對 10k+ Woo orders 造成壓力。
 2. 用瀏覽器登入 WordPress 後台。
-3. 開啟 `工具 > YS CART Woo 匯入`。
+3. 開啟 `YS Plugin > WooCommerce 匯入`。
 4. 在 UI 上傳 orders ZIP。
 5. UI 建立 `import/orders` job。
 6. 點「執行下一批」或「自動執行」完成匯入。
