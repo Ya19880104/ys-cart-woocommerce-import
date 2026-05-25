@@ -1,4 +1,4 @@
-# YS CART WooCommerce 匯入工具
+# YS CART WC 匯入
 
 獨立 WordPress 外掛，用於將 WooCommerce 客戶、商品與訂單匯出成可搬移套件，並匯入到 YS CART。
 
@@ -32,11 +32,11 @@
 
 主要入口：
 
-`YS Plugin > WooCommerce 匯入`
+`YS Plugin > YS CART WC 匯入`
 
 若 YS Plugin menu 尚未建立，備援位置為：
 
-`工具 > YS CART Woo 匯入`
+`工具 > YS CART WC 匯入`
 
 管理介面使用 REST 路由：
 

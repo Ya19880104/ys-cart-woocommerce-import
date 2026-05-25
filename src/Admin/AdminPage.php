@@ -15,8 +15,8 @@ final class AdminPage
         if ($this->hubMenuExists()) {
             add_submenu_page(
                 self::HUB_MENU_SLUG,
-                __('WooCommerce 匯入', 'ys-cart-woocommerce-import'),
-                __('WooCommerce 匯入', 'ys-cart-woocommerce-import'),
+                __('YS CART WC 匯入', 'ys-cart-woocommerce-import'),
+                __('YS CART WC 匯入', 'ys-cart-woocommerce-import'),
                 'manage_options',
                 self::SLUG,
                 [$this, 'render']
@@ -25,8 +25,8 @@ final class AdminPage
         }
 
         add_management_page(
-            __('YS CART Woo 匯入', 'ys-cart-woocommerce-import'),
-            __('YS CART Woo 匯入', 'ys-cart-woocommerce-import'),
+            __('YS CART WC 匯入', 'ys-cart-woocommerce-import'),
+            __('YS CART WC 匯入', 'ys-cart-woocommerce-import'),
             'manage_options',
             self::SLUG,
             [$this, 'render']

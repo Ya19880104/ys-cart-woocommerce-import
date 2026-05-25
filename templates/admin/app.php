@@ -2,7 +2,7 @@
 defined('ABSPATH') || exit;
 
 echo '<div class="wrap">';
-echo '<h1>' . esc_html__('YS CART WooCommerce 匯入工具', 'ys-cart-woocommerce-import') . '</h1>';
+echo '<h1>' . esc_html__('YS CART WC 匯入', 'ys-cart-woocommerce-import') . '</h1>';
 ?>
 <div class="ys-cwci-admin">
     <div id="ys-cwci-app" class="ys-cwci-shell">
