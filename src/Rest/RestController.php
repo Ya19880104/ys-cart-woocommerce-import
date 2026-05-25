@@ -6,6 +6,7 @@ namespace YangSheep\YsCartWooImport\Rest;
 defined('ABSPATH') || exit;
 
 use YangSheep\YsCartWooImport\Capabilities\CapabilityDetector;
+use YangSheep\YsCartWooImport\Rest\BackupController;
 
 final class RestController
 {
@@ -85,6 +86,36 @@ final class RestController
             'methods' => 'POST',
             'callback' => [new PackageController(), 'preview'],
             'permission_callback' => [Permission::class, 'admin'],
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/backups', [
+            'methods' => 'GET',
+            'callback' => [new BackupController(), 'list'],
+            'permission_callback' => [Permission::class, 'admin'],
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/backups', [
+            'methods' => 'POST',
+            'callback' => [new BackupController(), 'create'],
+            'permission_callback' => [Permission::class, 'admin'],
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/backups/(?P<file>[A-Za-z0-9._-]+)', [
+            'methods' => 'DELETE',
+            'callback' => [new BackupController(), 'delete'],
+            'permission_callback' => [Permission::class, 'admin'],
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/backups/(?P<file>[A-Za-z0-9._-]+)/restore', [
+            'methods' => 'POST',
+            'callback' => [new BackupController(), 'restore'],
+            'permission_callback' => [Permission::class, 'admin'],
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/backups/(?P<file>[A-Za-z0-9._-]+)/download', [
+            'methods' => 'GET',
+            'callback' => [new BackupController(), 'download'],
+            'permission_callback' => [Permission::class, 'adminDownload'],
         ]);
     }
 

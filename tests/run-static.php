@@ -18,13 +18,16 @@ $tests = [
     'static/order-source-integration.php',
     'static/customer-export-excludes-imported-users.php',
     'static/order-existing-shipping-backfill.php',
-    'static/security-hardening-v024.php',
+    'static/backup-routes.php',
+    'static/backup-manager-safety.php',
     'unit/status-mapper.php',
     'unit/package-validator.php',
     'unit/order-source-repository.php',
     'unit/customer-importer-user-retry.php',
     'unit/package-writer-reset.php',
     'unit/order-mapper-shipping.php',
+    'unit/sql-backup-parser.php',
+    'static/security-hardening-v024.php',
 ];
 
 $failures = 0;

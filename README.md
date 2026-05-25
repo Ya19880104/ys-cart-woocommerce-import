@@ -17,6 +17,7 @@
 - 移轉工作透過 REST 小批次執行，可續跑並降低單次請求壓力。
 - 可使用 Action Scheduler；未安裝時使用 WP-Cron 作為備援。
 - 匯入/匯出流程不依賴 WordPress admin-ajax.php。
+- 提供匯入前 SQL 備份，可本地保留、下載、刪除，並以確認碼執行還原。
 - 內建 YS Plugin Hub Client，可透過 YS Hub 安裝與更新。
 
 ## 重要對應規則
@@ -41,6 +42,14 @@
 管理介面使用 REST 路由：
 
 `/wp-json/ys-cart-wc-import/v1`
+
+## SQL 備份
+
+後台可建立目前 WordPress 資料表的 SQL 備份。備份檔會存放在 uploads 內的外掛私有目錄：
+
+`wp-content/uploads/ys-cart-wc-import/backups`
+
+備份列表支援下載、刪除與還原。還原會覆蓋目前資料表資料，必須輸入 `RESTORE` 才會執行。
 
 ## 上架與更新
 

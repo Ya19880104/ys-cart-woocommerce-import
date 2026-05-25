@@ -11,8 +11,8 @@
     const uploadForm = root.querySelector('[data-ys-cwci-upload]');
     const uploadResult = root.querySelector('[data-ys-cwci-upload-result]');
     const statusText = root.querySelector('[data-ys-cwci-status-text]');
+    const backups = root.querySelector('[data-ys-cwci-backups]');
 
-    let latestCapabilities = {};
     let autoRunningJobId = null;
 
     const entityLabels = {
@@ -64,6 +64,28 @@
     const isTerminal = (status) => ['completed', 'failed', 'cancelled'].includes(String(status || ''));
     const canRun = (status) => !isTerminal(status);
 
+    const formatBytes = (bytes) => {
+        const value = Number(bytes || 0);
+        if (value < 1024) {
+            return `${value} B`;
+        }
+        if (value < 1024 * 1024) {
+            return `${(value / 1024).toFixed(1)} KB`;
+        }
+        return `${(value / 1024 / 1024).toFixed(1)} MB`;
+    };
+
+    const formatDate = (value) => {
+        if (!value) {
+            return '';
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return value;
+        }
+        return date.toLocaleString();
+    };
+
     const progressOf = (job) => {
         const total = Number(job.total_count || 0);
         const processed = Number(job.processed_count || 0);
@@ -77,27 +99,23 @@
     };
 
     const renderCapabilities = (data) => {
-        latestCapabilities = data || {};
         const items = [
             {
-                key: 'woocommerce',
                 label: 'WooCommerce',
                 enabled: !!data.woocommerce,
                 ok: '可匯出',
-                missing: '未啟用，只能執行匯入端'
+                missing: '未啟用，只能使用匯入端'
             },
             {
-                key: 'ys_cart',
                 label: 'YS CART',
                 enabled: !!data.ys_cart,
                 ok: '可匯入',
-                missing: '未啟用，只能執行 Woo 匯出'
+                missing: '未啟用，只能使用 Woo 匯出'
             },
             {
-                key: 'can_direct_transfer',
                 label: '同站直接移轉',
                 enabled: !!data.can_direct_transfer,
-                ok: '同站可直接轉換',
+                ok: '同站可用',
                 missing: '跨站請使用 ZIP 匯出/匯入'
             }
         ];
@@ -158,12 +176,12 @@
             const errors = Number(job.error_count || 0);
             const active = !isTerminal(status);
             const download = job.file_name
-                ? `<a class="ysca-btn ysca-btn--ghost ysca-btn--sm" href="${escapeHtml(window.ysCwciAdmin.restUrl)}/jobs/${Number(job.id)}/download">
+                ? `<a class="ys-cwci-btn ys-cwci-btn--ghost ys-cwci-btn--sm" href="${escapeHtml(window.ysCwciAdmin.restUrl)}/jobs/${Number(job.id)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}">
                     <span class="dashicons dashicons-download" aria-hidden="true"></span>下載
                 </a>`
                 : '';
             const errorButton = errors > 0
-                ? `<button type="button" class="ysca-btn ysca-btn--ghost ysca-btn--sm" data-ys-cwci-errors="${Number(job.id)}">錯誤</button>`
+                ? `<button type="button" class="ys-cwci-btn ys-cwci-btn--ghost ys-cwci-btn--sm" data-ys-cwci-errors="${Number(job.id)}">錯誤</button>`
                 : '';
 
             return `
@@ -172,7 +190,7 @@
                         <div>
                             <div class="ys-cwci-job__title">
                                 <strong>#${Number(job.id)} ${escapeHtml(type)}/${escapeHtml(entity)}</strong>
-                                <span class="ysca-badge ysca-badge--${escapeHtml(status)}">${escapeHtml(statusLabels[status] || status)}</span>
+                                <span class="ys-cwci-badge ys-cwci-badge--${escapeHtml(status)}">${escapeHtml(statusLabels[status] || status)}</span>
                             </div>
                             <div class="ys-cwci-job__meta">
                                 <span>已處理 ${processed}</span>
@@ -184,8 +202,8 @@
                         <div class="ys-cwci-job__actions">
                             ${download}
                             ${errorButton}
-                            <button type="button" class="ysca-btn ysca-btn--ghost ysca-btn--sm" data-ys-cwci-run="${Number(job.id)}" ${canRun(status) ? '' : 'disabled'}>執行下一批</button>
-                            <button type="button" class="ysca-btn ysca-btn--primary ysca-btn--sm" data-ys-cwci-auto-run="${Number(job.id)}" ${canRun(status) ? '' : 'disabled'}>自動執行</button>
+                            <button type="button" class="ys-cwci-btn ys-cwci-btn--ghost ys-cwci-btn--sm" data-ys-cwci-run="${Number(job.id)}" ${canRun(status) ? '' : 'disabled'}>執行下一批</button>
+                            <button type="button" class="ys-cwci-btn ys-cwci-btn--primary ys-cwci-btn--sm" data-ys-cwci-auto-run="${Number(job.id)}" ${canRun(status) ? '' : 'disabled'}>自動執行</button>
                         </div>
                     </div>
                     <div class="ys-cwci-progress" aria-label="工作進度">
@@ -207,6 +225,108 @@
             setStatus('讀取工作失敗');
             return [];
         });
+
+    const renderBackups = (items) => {
+        if (!backups) {
+            return;
+        }
+
+        if (!Array.isArray(items) || !items.length) {
+            backups.innerHTML = `
+                <div class="ys-cwci-empty ys-cwci-empty--compact">
+                    <strong>尚未建立備份</strong>
+                    <span>匯入前建議先建立 SQL 備份。</span>
+                </div>
+            `;
+            return;
+        }
+
+        backups.innerHTML = items.map((backup) => {
+            const file = String(backup.file || '');
+            const downloadUrl = `${window.ysCwciAdmin.restUrl}/backups/${encodeURIComponent(file)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}`;
+            return `
+                <article class="ys-cwci-backup">
+                    <div>
+                        <strong>${escapeHtml(file)}</strong>
+                        <span>${escapeHtml(formatBytes(backup.size))} · ${escapeHtml(formatDate(backup.created_at))}</span>
+                    </div>
+                    <div class="ys-cwci-backup__actions">
+                        <a class="ys-cwci-btn ys-cwci-btn--ghost ys-cwci-btn--sm" href="${escapeHtml(downloadUrl)}">
+                            <span class="dashicons dashicons-download" aria-hidden="true"></span>下載
+                        </a>
+                        <button type="button" class="ys-cwci-btn ys-cwci-btn--ghost ys-cwci-btn--sm" data-ys-cwci-backup-restore="${escapeHtml(file)}">還原</button>
+                        <button type="button" class="ys-cwci-btn ys-cwci-btn--danger ys-cwci-btn--sm" data-ys-cwci-backup-delete="${escapeHtml(file)}">刪除</button>
+                    </div>
+                </article>
+            `;
+        }).join('');
+    };
+
+    const loadBackups = () => api('/ys-cart-wc-import/v1/backups')
+        .then((data) => {
+            renderBackups(data.backups || []);
+            return data.backups || [];
+        })
+        .catch((error) => {
+            if (backups) {
+                backups.innerHTML = `<div class="ys-cwci-alert is-error">${escapeHtml(error.message || '無法讀取備份。')}</div>`;
+            }
+            return [];
+        });
+
+    const createBackup = async (button) => {
+        setBusy(button, true);
+        setStatus('正在建立 SQL 備份');
+        try {
+            const result = await api('/ys-cart-wc-import/v1/backups', { method: 'POST' });
+            if (result.error) {
+                throw new Error(result.message || '建立備份失敗。');
+            }
+            setStatus(`備份已建立：${result.backup?.file || ''}`);
+            await loadBackups();
+        } catch (error) {
+            setStatus(error.message || '建立備份失敗。');
+        } finally {
+            setBusy(button, false);
+        }
+    };
+
+    const deleteBackup = async (file, button) => {
+        if (!window.confirm(`確定要刪除備份？\n${file}`)) {
+            return;
+        }
+        setBusy(button, true);
+        try {
+            await api(`/ys-cart-wc-import/v1/backups/${encodeURIComponent(file)}`, { method: 'DELETE' });
+            setStatus('備份已刪除');
+            await loadBackups();
+        } catch (error) {
+            setStatus(error.message || '刪除備份失敗。');
+        } finally {
+            setBusy(button, false);
+        }
+    };
+
+    const restoreBackup = async (file, button) => {
+        const confirmText = window.prompt(`還原會覆蓋目前資料庫資料。\n若確定要還原 ${file}，請輸入 RESTORE`);
+        if (confirmText !== 'RESTORE') {
+            setStatus('已取消還原');
+            return;
+        }
+        setBusy(button, true);
+        setStatus('正在還原 SQL 備份');
+        try {
+            const result = await api(`/ys-cart-wc-import/v1/backups/${encodeURIComponent(file)}/restore`, {
+                method: 'POST',
+                data: { confirm: 'RESTORE' }
+            });
+            setStatus(`還原完成，已執行 ${Number(result.restored?.statements || 0)} 個 SQL statements`);
+        } catch (error) {
+            setStatus(error.message || '還原備份失敗。');
+        } finally {
+            setBusy(button, false);
+        }
+    };
 
     const getJob = (id) => api(`/ys-cart-wc-import/v1/jobs/${id}`);
 
@@ -278,6 +398,10 @@
         const autoRunButton = event.target.closest('[data-ys-cwci-auto-run]');
         const refreshButton = event.target.closest('[data-ys-cwci-refresh]');
         const errorButton = event.target.closest('[data-ys-cwci-errors]');
+        const backupCreateButton = event.target.closest('[data-ys-cwci-backup-create]');
+        const backupRefreshButton = event.target.closest('[data-ys-cwci-backup-refresh]');
+        const backupDeleteButton = event.target.closest('[data-ys-cwci-backup-delete]');
+        const backupRestoreButton = event.target.closest('[data-ys-cwci-backup-restore]');
 
         if (exportButton) {
             const entity = exportButton.getAttribute('data-ys-cwci-export');
@@ -312,11 +436,28 @@
 
         if (refreshButton) {
             setBusy(refreshButton, true);
-            Promise.all([loadCapabilities(), loadJobs()]).finally(() => setBusy(refreshButton, false));
+            Promise.all([loadCapabilities(), loadJobs(), loadBackups()]).finally(() => setBusy(refreshButton, false));
         }
 
         if (errorButton) {
             showErrors(Number(errorButton.getAttribute('data-ys-cwci-errors')), errorButton);
+        }
+
+        if (backupCreateButton) {
+            createBackup(backupCreateButton);
+        }
+
+        if (backupRefreshButton) {
+            setBusy(backupRefreshButton, true);
+            loadBackups().finally(() => setBusy(backupRefreshButton, false));
+        }
+
+        if (backupDeleteButton) {
+            deleteBackup(backupDeleteButton.getAttribute('data-ys-cwci-backup-delete'), backupDeleteButton);
+        }
+
+        if (backupRestoreButton) {
+            restoreBackup(backupRestoreButton.getAttribute('data-ys-cwci-backup-restore'), backupRestoreButton);
         }
     });
 
@@ -387,7 +528,7 @@
         });
     }
 
-    Promise.all([loadCapabilities(), loadJobs()]);
+    Promise.all([loadCapabilities(), loadJobs(), loadBackups()]);
 
     window.setInterval(() => {
         if (!document.hidden && !autoRunningJobId) {
