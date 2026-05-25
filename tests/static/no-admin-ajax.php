@@ -25,6 +25,10 @@ foreach ($rii as $file) {
         continue;
     }
 
+    if (str_starts_with($relative, 'vendor/yangsheep/ys-plugin-hub-client/')) {
+        continue;
+    }
+
     $contents = file_get_contents($path);
     foreach (['wp_ajax_', 'wp_ajax_nopriv_', 'admin-ajax.php', 'ajaxurl'] as $needle) {
         if (strpos($contents, $needle) !== false) {
@@ -36,4 +40,3 @@ foreach ($rii as $file) {
 if ($violations !== []) {
     throw new RuntimeException("admin-ajax usage is forbidden:\n" . implode("\n", $violations));
 }
-

@@ -16,7 +16,8 @@ Standalone WordPress plugin for exporting WooCommerce data and importing it into
 - Keep subscription products out of the general product engine. Subscription products should be imported by a separate optional subscription engine.
 - Run migration work through REST-triggered jobs.
 - Use Action Scheduler when available and WP-Cron as fallback.
-- Avoid WordPress admin request endpoints entirely.
+- Keep the migration import/export workflow off WordPress admin request endpoints.
+- Register with the bundled YS Plugin Hub Client for YS Hub installation and update delivery.
 
 ## Important Mapping Rules
 
@@ -40,6 +41,14 @@ On WooCommerce-only export sites without YS CART, the fallback location is:
 The UI calls REST routes under:
 
 `/wp-json/ys-cart-wc-import/v1`
+
+## Distribution
+
+The plugin bundles `vendor/yangsheep/ys-plugin-hub-client` and registers itself with slug
+`ys-cart-woocommerce-import` during `plugins_loaded` priority `5`.
+
+Release packages should include the tracked vendor Hub Client files and exclude local build
+artifacts, logs, temporary files, and generated zip files.
 
 ## Documentation
 

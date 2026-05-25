@@ -13,6 +13,7 @@ $tests = [
     'static/admin-slug-independence.php',
     'static/admin-auto-run-flow.php',
     'static/job-runner-lock.php',
+    'static/hub-client-integration.php',
     'static/admin-user-role-guard.php',
     'static/order-source-integration.php',
     'static/customer-export-excludes-imported-users.php',

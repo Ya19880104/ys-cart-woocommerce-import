@@ -1,6 +1,11 @@
 /vendor/
+!/vendor/
+!/vendor/autoload.php
+!/vendor/yangsheep/
+!/vendor/yangsheep/ys-plugin-hub-client/
+!/vendor/yangsheep/ys-plugin-hub-client/**
+/vendor/yangsheep/ys-plugin-hub-client/tests/
 /dist/
 /.phpunit.result.cache
 *.zip
 *.log
-
