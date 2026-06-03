@@ -19,6 +19,9 @@ foreach ([
     'Deny from all',
     'web.config',
     "confirm !== 'RESTORE'",
+    'HEADER_PREFIX',
+    'hasManagedBackupHeader',
+    'pre_restore_backup',
 ] as $needle) {
     if (strpos($manager, $needle) === false) {
         throw new RuntimeException("Missing backup safety marker: {$needle}");

@@ -4,8 +4,9 @@ declare(strict_types=1);
 $root = dirname(__DIR__, 2);
 $writerFile = $root . '/src/Packages/PackageWriter.php';
 $readerFile = $root . '/src/Packages/PackageReader.php';
+$protectedDirFile = $root . '/src/Security/ProtectedDirectory.php';
 
-if (!is_file($writerFile) || !is_file($readerFile)) {
+if (!is_file($writerFile) || !is_file($readerFile) || !is_file($protectedDirFile)) {
     throw new RuntimeException('Package writer or reader is missing.');
 }
 
@@ -31,6 +32,7 @@ if (!function_exists('wp_generate_uuid4')) {
 }
 
 require_once $readerFile;
+require_once $protectedDirFile;
 require_once $writerFile;
 
 $writerClass = 'YangSheep\\YsCartWooImport\\Packages\\PackageWriter';

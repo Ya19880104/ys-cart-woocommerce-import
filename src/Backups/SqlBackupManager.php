@@ -7,6 +7,7 @@ defined('ABSPATH') || exit;
 
 final class SqlBackupManager
 {
+    private const HEADER_PREFIX = '-- YS CART WC import SQL backup';
     private const FILE_PREFIX = 'ys-cwci-backup-';
     private const BATCH_SIZE = 300;
 
@@ -91,6 +92,11 @@ final class SqlBackupManager
             throw new \RuntimeException(__('備份檔案是空的。', 'ys-cart-woocommerce-import'));
         }
 
+        if (!$this->hasManagedBackupHeader($sql)) {
+            throw new \RuntimeException(__('Invalid or unmanaged SQL backup file.', 'ys-cart-woocommerce-import'));
+        }
+
+        $preRestoreBackup = $this->create();
         $statements = self::splitSqlStatements($sql);
         $executed = 0;
 
@@ -113,6 +119,7 @@ final class SqlBackupManager
         return [
             'file' => basename($path),
             'statements' => $executed,
+            'pre_restore_backup' => $preRestoreBackup['file'] ?? '',
         ];
     }
 
@@ -255,7 +262,7 @@ final class SqlBackupManager
 
     private function writeHeader($handle): void
     {
-        fwrite($handle, "-- YS CART WC import SQL backup\n");
+        fwrite($handle, self::HEADER_PREFIX . "\n");
         fwrite($handle, '-- Created at UTC: ' . gmdate('c') . "\n");
         if (function_exists('home_url')) {
             fwrite($handle, '-- Site: ' . home_url('/') . "\n");
@@ -330,6 +337,11 @@ final class SqlBackupManager
     private function isValidBackupName(string $file): bool
     {
         return preg_match('/^ys-cwci-backup-[0-9]{8}-[0-9]{6}-[a-f0-9]{16}\.sql$/', $file) === 1;
+    }
+
+    private function hasManagedBackupHeader(string $sql): bool
+    {
+        return str_starts_with(ltrim($sql), self::HEADER_PREFIX);
     }
 
     private function formatBackup(string $path): array

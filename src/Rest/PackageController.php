@@ -7,6 +7,7 @@ defined('ABSPATH') || exit;
 
 use RuntimeException;
 use YangSheep\YsCartWooImport\Packages\PackageReader;
+use YangSheep\YsCartWooImport\Security\ProtectedDirectory;
 
 final class PackageController
 {
@@ -25,7 +26,7 @@ final class PackageController
 
         $upload = wp_upload_dir();
         $dir = trailingslashit((string)$upload['basedir']) . 'ys-cart-wc-import/uploads';
-        wp_mkdir_p($dir);
+        ProtectedDirectory::ensure($dir, ['.zip']);
         $target = $dir . '/' . wp_generate_uuid4() . '-' . $name;
 
         if (!move_uploaded_file((string)$file['tmp_name'], $target)) {
@@ -54,4 +55,3 @@ final class PackageController
         ];
     }
 }
-

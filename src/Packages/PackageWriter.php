@@ -7,6 +7,7 @@ defined('ABSPATH') || exit;
 
 use RuntimeException;
 use ZipArchive;
+use YangSheep\YsCartWooImport\Security\ProtectedDirectory;
 
 final class PackageWriter
 {
@@ -19,9 +20,7 @@ final class PackageWriter
             $dir = trailingslashit((string)$upload['basedir']) . 'ys-cart-wc-import';
         }
 
-        if (!is_dir($dir) && !wp_mkdir_p($dir)) {
-            throw new RuntimeException('Unable to create migration package directory.');
-        }
+        ProtectedDirectory::ensure($dir, ['.zip', '.json', '.jsonl']);
 
         $this->dir = rtrim($dir, '/\\');
     }
@@ -110,9 +109,7 @@ final class PackageWriter
         $safe = $this->safePackageId($packageId);
         $path = $this->dir . '/' . $safe;
 
-        if (!is_dir($path) && !wp_mkdir_p($path)) {
-            throw new RuntimeException('Unable to create package working directory.');
-        }
+        ProtectedDirectory::ensure($path, ['.json', '.jsonl']);
 
         return $path;
     }

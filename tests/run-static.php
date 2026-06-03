@@ -20,6 +20,7 @@ $tests = [
     'static/order-existing-shipping-backfill.php',
     'static/backup-routes.php',
     'static/backup-manager-safety.php',
+    'static/package-directory-protection.php',
     'unit/status-mapper.php',
     'unit/package-validator.php',
     'unit/order-source-repository.php',
