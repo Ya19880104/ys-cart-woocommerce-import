@@ -15,9 +15,8 @@ final class Scheduler
         // 原 ['job_id' => $jobId] associative array、Action Scheduler 透過
         // call_user_func_array 把整 array 當單一 arg 傳給 listener →
         // JobRunner::runScheduledJob 收到 array、(int)$array = 1 → 每個
-        // async job 都跑 jobId=1。LIVE dev-checkout 證實 wp_actionscheduler_actions
-        // 為 0 rows（10K LIVE test 走 manual runNext loop、AS path 從未真實觸發）。
-        // Fix: 用 positional args [$jobId]、對齊 line 20 wp_schedule_single_event 的 pattern。
+        // async job 都跑 jobId=1。
+        // Fix: 用 positional args [$jobId]、對齊下方 wp_schedule_single_event 的 pattern。
         if (function_exists('as_enqueue_async_action')) {
             as_enqueue_async_action(self::HOOK_RUN_JOB, [$jobId], 'ys-cart-wc-import', true);
             return;

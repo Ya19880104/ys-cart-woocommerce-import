@@ -9,3 +9,7 @@
 /.phpunit.result.cache
 *.zip
 *.log
+
+# Dev-only docs — keep local, never publish
+/docs/superpowers/
+/docs/mcp-skills/
