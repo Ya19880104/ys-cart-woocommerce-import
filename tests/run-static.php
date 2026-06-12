@@ -28,9 +28,6 @@ $tests = [
     'unit/package-writer-reset.php',
     'unit/order-mapper-shipping.php',
     'unit/sql-backup-parser.php',
-    // NOTE: security-hardening-v024.php ends with exit() — it MUST stay last,
-    // anything listed after it would be skipped. New harness-friendly tests
-    // (which throw on failure instead of exit) go ABOVE this line.
     'static/stability-hardening-v050.php',
     'static/migration-guidance-v051.php',
     'static/wizard-mode-v060.php',

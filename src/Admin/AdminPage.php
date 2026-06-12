@@ -5,14 +5,10 @@ namespace YangSheep\YsCartWooImport\Admin;
 
 defined('ABSPATH') || exit;
 
-use YangSheep\YsCartWooImport\Capabilities\CapabilityDetector;
-
 final class AdminPage
 {
     public const SLUG = 'ys-ec-woo-import';
     private const HUB_MENU_SLUG = 'ys-toolbox';
-    /** YS CART 核心 takeover chrome 類別（存在時才套用，純匯出站不依賴）。 */
-    private const YS_ADMIN_APP = '\YangSheep\Ecommerce\Admin\YSAdminApp';
 
     public function register(): void
     {
@@ -60,6 +56,25 @@ final class AdminPage
             return;
         }
 
+        // v0.7.1 舊核心相容：YS CART < 2.52.31 會因本頁 slug 撞 ys-ec-* 前綴而誤載
+        // 其 admin 資產並加上 ysca-active / ysca-hide-wp-chrome body class（隱藏 WP 選單、
+        // 卻沒有 shell 可掛）→ 破版。新核心已把本頁列入 WP-native 排除清單；
+        // 舊核心由本外掛自行中和：晚序拔掉 body class + 反註冊核心 admin 樣式/腳本。
+        $coreVersion = defined('YS_ECOMMERCE_VERSION') ? (string)YS_ECOMMERCE_VERSION : '';
+        if ($coreVersion !== '' && version_compare($coreVersion, '2.52.31', '<')) {
+            add_filter('admin_body_class', static function ($classes): string {
+                return trim((string)preg_replace('/\bysca-[a-z0-9_-]+\b/', '', (string)$classes));
+            }, 999);
+            add_action('admin_enqueue_scripts', static function (): void {
+                foreach (['tokens', 'shell', 'components', 'pages', 'legacy-bridge', 'product-card', 'seo-fields'] as $suffix) {
+                    wp_dequeue_style('ys-cart-admin-' . $suffix);
+                }
+                foreach (['api', 'shell', 'table'] as $suffix) {
+                    wp_dequeue_script('ys-cart-admin-' . $suffix);
+                }
+            }, 999);
+        }
+
         wp_enqueue_style(
             'ys-cwci-admin',
             YS_CWCI_PLUGIN_URL . 'assets/css/admin.css',
@@ -88,26 +103,9 @@ final class AdminPage
 
     public function render(): void
     {
-        $template = YS_CWCI_PLUGIN_DIR . 'templates/admin/app.php';
-
-        // v0.5.0 UI：偵測到 YS CART 時套用核心 YSAdminApp takeover chrome（側欄＋頂列＋
-        // ysca 設計系統），讓匯入頁在買家的 YS CART 後台中原生一致。純匯出站（無 YS CART）
-        // 維持既有獨立 .wrap shell，不硬依賴核心 → 兼顧 5 原則與 standalone 運行。
-        // 註：核心 YSAdminAssets 已對 ys-ec-* slug 載入 ysca 資產，故此處只需正確掛載 chrome。
-        $ys_cwci_chrome = (new CapabilityDetector())->hasYsCart()
-            && class_exists(self::YS_ADMIN_APP);
-
-        if ($ys_cwci_chrome) {
-            $app = self::YS_ADMIN_APP;
-            $app::open(
-                __('WooCommerce 匯入', 'ys-cart-woocommerce-import'),
-                __('YS CART / WooCommerce 匯入', 'ys-cart-woocommerce-import')
-            );
-            require $template;
-            $app::close();
-            return;
-        }
-
-        require $template;
+        // v0.7.1：匯入工具是「獨立外掛」— 可在無 YS CART 環境使用、不屬於 YS CART 選單，
+        // 一律以自身獨立 UI 渲染（移除 v0.5.0 的條件式 YSAdminApp 包裹）。
+        // 配合核心 >= 2.52.31 已將本頁列入 WP-native 排除清單（不載 YS CSS / 不進 takeover）。
+        require YS_CWCI_PLUGIN_DIR . 'templates/admin/app.php';
     }
 }

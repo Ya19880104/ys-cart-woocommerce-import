@@ -82,14 +82,14 @@ v050_check('B6 ProductImporter sideloads images (gated) before transaction',
     && str_contains($productImp, 'if ($sideloadImages)')
     && $posSideload !== false && $posTxn !== false && $posSideload < $posTxn);
 
-// B7 — conditional chrome
-v050_check('B7 AdminPage conditional YSAdminApp chrome + template gates .wrap',
-    str_contains($adminPage, 'YS_ADMIN_APP')
-    && str_contains($adminPage, 'hasYsCart()')
-    && str_contains($adminPage, '::open(')
-    && str_contains($adminPage, '::close()')
-    && str_contains($template, '$ys_cwci_chrome')
-    && (bool) preg_match("/if \\(!\\\$ys_cwci_chrome\\)[\\s\\S]{0,40}wrap ys-cwci-wrap/s", $template));
+// B7 — v0.7.1 產品決策反轉（user 2026-06-13）：匯入工具是獨立外掛（可在無 YS CART
+// 環境使用、不屬於 YS CART 選單），一律獨立 UI、「不得」包 YSAdminApp chrome；
+// 配合核心 >= 2.52.31 將 ys-ec-woo-import 列入 WP-native 排除清單。
+v050_check('B7 AdminPage renders standalone (NO YSAdminApp chrome)',
+    !str_contains($adminPage, 'YS_ADMIN_APP')      // 不得宣告 chrome 類別常數
+    && !str_contains($adminPage, '::open(')         // 不得呼叫 YSAdminApp::open/close
+    && !str_contains($adminPage, '::close(')
+    && str_contains($template, 'wrap ys-cwci-wrap'));
 
 // B8 — M1
 v050_check('B8 orders + customers seed total_count from manifest',

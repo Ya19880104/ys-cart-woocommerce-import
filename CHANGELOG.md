@@ -5,6 +5,16 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.1] - 2026-06-13 — 回歸獨立 UI
+
+### Changed
+
+- **移除 v0.5.0 的條件式 YS CART 外框（YSAdminApp）包裹**：匯入工具是
+  **獨立外掛** — 可在未啟用 YS CART 的網站使用、不屬於 YS CART 的後台選單，
+  因此一律以自身獨立介面渲染，不再於 YS CART 站上載入其側欄／頂列外框。
+  配合 YS CART core 2.52.31 將本頁列入 WP-native 排除清單（不載入 YS CSS、
+  不套 takeover 樣式），新舊核心皆顯示一致的獨立 UI。
+
 ## [0.7.0] - 2026-06-13 — 中斷繼續、全部重試、跨站整合、訂單狀態選擇
 
 ### Added

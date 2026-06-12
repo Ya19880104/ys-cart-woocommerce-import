@@ -100,4 +100,7 @@ v024_check(
 );
 
 echo "\nPASS={$pass} FAIL={$fail}\n";
-exit($fail === 0 ? 0 : 1);
+if ($fail > 0) {
+    // v0.7.1: throw（勿 exit）— exit(0) 會吞掉 harness 先前累計的失敗
+    throw new RuntimeException("v0.2.4 security hardening contract FAILED ({$fail})");
+}
