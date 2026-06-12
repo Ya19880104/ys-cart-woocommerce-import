@@ -3,7 +3,7 @@
  * Plugin Name: YS CART WC 匯入
  * Plugin URI:  https://yangsheep.com.tw
  * Description: WooCommerce 客戶、商品與訂單移轉到 YS CART 的匯出匯入工具，支援可續跑 REST 批次工作。
- * Version:     0.5.1
+ * Version:     0.6.0
  * Author:      YANGSHEEP DESIGN
  * Author URI:  https://yangsheep.com.tw
  * License:     GPL-2.0-or-later
@@ -17,7 +17,7 @@
 
 defined('ABSPATH') || exit;
 
-define('YS_CWCI_VERSION', '0.5.1');
+define('YS_CWCI_VERSION', '0.6.0');
 define('YS_CWCI_PLUGIN_FILE', __FILE__);
 define('YS_CWCI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('YS_CWCI_PLUGIN_URL', plugin_dir_url(__FILE__));

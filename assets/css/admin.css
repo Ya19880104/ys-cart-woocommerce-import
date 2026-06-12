@@ -494,6 +494,151 @@
     }
 }
 
+/* v0.6.0：精靈／手動 模式切換 */
+.ys-cwci-mode {
+    display: flex;
+    gap: 10px;
+}
+
+.ys-cwci-mode__tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border: 1.5px solid #d7e1ee;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #33475f;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ys-cwci-mode__tab small {
+    font-weight: 400;
+    color: #5e7188;
+}
+
+.ys-cwci-mode__tab:hover {
+    border-color: #2864d8;
+}
+
+.ys-cwci-mode__tab.is-active {
+    border-color: #2864d8;
+    box-shadow: 0 0 0 1px #2864d8 inset;
+    color: #1f56bd;
+}
+
+/* v0.6.0：搬家精靈 */
+.ys-cwci-wizard {
+    display: grid;
+    gap: 16px;
+}
+
+.ys-cwci-wizard__rail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ys-cwci-wizard__step {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    padding: 6px 12px;
+    border: 1px solid #d7e1ee;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #5e7188;
+    font-size: 13px;
+}
+
+.ys-cwci-wizard__num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #eef3fa;
+    color: #31506f;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.ys-cwci-wizard__step.is-current {
+    border-color: #2864d8;
+    color: #1f56bd;
+    font-weight: 700;
+}
+
+.ys-cwci-wizard__step.is-current .ys-cwci-wizard__num {
+    background: #2864d8;
+    color: #ffffff;
+}
+
+.ys-cwci-wizard__step.is-done {
+    color: #2e9b6b;
+}
+
+.ys-cwci-wizard__step.is-done .ys-cwci-wizard__num {
+    background: #e3f4ec;
+    color: #2e9b6b;
+}
+
+.ys-cwci-wizard__panel {
+    display: grid;
+    gap: 14px;
+    padding: 16px;
+    border: 1px solid #e3eaf3;
+    border-radius: 8px;
+    background: #f8fafd;
+}
+
+.ys-cwci-wizard__desc {
+    margin: 0;
+    color: #33475f;
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.ys-cwci-wizard__panel .ys-cwci-btn {
+    justify-self: start;
+}
+
+.ys-cwci-wizard__progress {
+    display: grid;
+    gap: 8px;
+}
+
+.ys-cwci-wizard__progress p {
+    margin: 0;
+    color: #31506f;
+    font-size: 13px;
+}
+
+.ys-cwci-wizard__log {
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: #102033;
+    color: #cfe2ff;
+    font-family: Consolas, Monaco, monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    max-height: 180px;
+    overflow: auto;
+}
+
+.ys-cwci-wizard__actions {
+    display: flex;
+    gap: 8px;
+}
+
 /* v0.5.1：網址與 slug 搬家指引 */
 .ys-cwci-guidance {
     display: grid;

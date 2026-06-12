@@ -5,6 +5,25 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.6.0] - 2026-06-12 — 精靈模式 & 手動模式
+
+### Added
+
+- **雙操作模式**，頁面頂部一鍵切換（選擇記憶於瀏覽器）：
+  - **精靈模式（預設）** — 步驟式引導。依環境自動選擇流程：
+    - **同站搬家**（Woo + YS CART 同站）：環境檢查 → SQL 備份（建議、可略過）→
+      依「客戶 → 商品 → 訂單」順序逐項匯出＋直接匯入，每步即時進度條與
+      成功/錯誤計數，完成後總結 + WooCommerce 停用提醒。已搬過的資料自動
+      去重，可重複執行。
+    - **匯出精靈**（來源站只有 Woo）：逐項打包 ZIP，完成頁附下載連結與
+      下一步指引。
+    - **匯入精靈**（目標站只有 YS CART）：備份 → 逐項上傳套件並匯入。
+  - **手動模式** — 既有工程化介面原封保留：移轉能力、搬家指引、匯出/上傳
+    匯入、**工作紀錄（LOG）**、錯誤檢視、**SQL 備份／還原（回溯）**。
+  - 精靈執行的工作同樣寫入工作紀錄，隨時可切到手動模式查 LOG 或還原。
+- 精靈同站匯入所需的 source fingerprint 由 PHP 端預先計算下發
+  （`hash('sha256', home_url())`），避免 JS 端因子目錄/尾斜線差異算錯。
+
 ## [0.5.1] - 2026-06-12 — URL & slug migration guidance
 
 ### Added

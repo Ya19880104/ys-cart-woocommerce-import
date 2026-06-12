@@ -23,6 +23,39 @@ if (!$ys_cwci_chrome) {
             </div>
         </header>
 
+        <!-- v0.6.0：精靈／手動 雙模式切換（localStorage 記憶、預設精靈） -->
+        <div class="ys-cwci-mode" role="tablist" aria-label="<?php echo esc_attr__('操作模式', 'ys-cart-woocommerce-import'); ?>">
+            <button type="button" class="ys-cwci-mode__tab" role="tab" data-ys-cwci-mode="wizard">
+                <span class="dashicons dashicons-controls-forward" aria-hidden="true"></span>
+                <?php echo esc_html__('精靈模式', 'ys-cart-woocommerce-import'); ?>
+                <small><?php echo esc_html__('步驟式引導', 'ys-cart-woocommerce-import'); ?></small>
+            </button>
+            <button type="button" class="ys-cwci-mode__tab" role="tab" data-ys-cwci-mode="manual">
+                <span class="dashicons dashicons-admin-tools" aria-hidden="true"></span>
+                <?php echo esc_html__('手動模式', 'ys-cart-woocommerce-import'); ?>
+                <small><?php echo esc_html__('工作紀錄／備份／還原', 'ys-cart-woocommerce-import'); ?></small>
+            </button>
+        </div>
+
+        <!-- 精靈模式 -->
+        <section class="ys-cwci-card ys-cwci-card--accent" data-ys-cwci-mode-panel="wizard" hidden>
+            <div class="ys-cwci-card__head">
+                <div>
+                    <p class="ys-cwci-kicker"><?php echo esc_html__('搬家精靈', 'ys-cart-woocommerce-import'); ?></p>
+                    <h2 data-ys-cwci-wizard-title><?php echo esc_html__('偵測環境中…', 'ys-cart-woocommerce-import'); ?></h2>
+                </div>
+            </div>
+            <div class="ys-cwci-wizard" data-ys-cwci-wizard>
+                <ol class="ys-cwci-wizard__rail" data-ys-cwci-wizard-rail></ol>
+                <div class="ys-cwci-wizard__panel" data-ys-cwci-wizard-panel>
+                    <div class="ys-cwci-skeleton"></div>
+                </div>
+                <div class="ys-cwci-wizard__actions" data-ys-cwci-wizard-actions></div>
+            </div>
+        </section>
+
+        <?php /* manual 預設可見（JS 失效時仍可操作）；JS 載入後依記憶模式切換 */ ?>
+        <div data-ys-cwci-mode-panel="manual" class="ys-cwci-manual">
         <section class="ys-cwci-card">
             <div class="ys-cwci-card__head">
                 <div>
@@ -198,6 +231,7 @@ if (!$ys_cwci_chrome) {
             </div>
             <div data-ys-cwci-jobs class="ys-cwci-jobs"></div>
         </section>
+        </div><!-- /[data-ys-cwci-mode-panel="manual"] -->
     </div>
 </div>
 <?php

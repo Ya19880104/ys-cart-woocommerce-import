@@ -528,7 +528,345 @@
         });
     }
 
-    Promise.all([loadCapabilities(), loadJobs(), loadBackups()]);
+    /* ─────────────────────────────────────────────
+       v0.6.0 精靈模式（步驟式引導）＋ 模式切換
+       手動模式 = 既有工程化 UI（上方全部程式不動）。
+       ───────────────────────────────────────────── */
+
+    const MODE_KEY = 'ys_cwci_mode';
+    const modeTabs = root.querySelectorAll('[data-ys-cwci-mode]');
+    const modePanels = root.querySelectorAll('[data-ys-cwci-mode-panel]');
+
+    const applyMode = (mode) => {
+        const target = mode === 'manual' ? 'manual' : 'wizard';
+        modePanels.forEach((panel) => {
+            panel.hidden = panel.getAttribute('data-ys-cwci-mode-panel') !== target;
+        });
+        modeTabs.forEach((tab) => {
+            tab.classList.toggle('is-active', tab.getAttribute('data-ys-cwci-mode') === target);
+            tab.setAttribute('aria-selected', tab.getAttribute('data-ys-cwci-mode') === target ? 'true' : 'false');
+        });
+        try { window.localStorage.setItem(MODE_KEY, target); } catch (e) { /* storage 不可用就不記憶 */ }
+    };
+
+    modeTabs.forEach((tab) => {
+        tab.addEventListener('click', () => applyMode(tab.getAttribute('data-ys-cwci-mode')));
+    });
+
+    const wizardRoot = root.querySelector('[data-ys-cwci-wizard]');
+    const wizard = wizardRoot ? {
+        rail: wizardRoot.querySelector('[data-ys-cwci-wizard-rail]'),
+        panel: wizardRoot.querySelector('[data-ys-cwci-wizard-panel]'),
+        actions: wizardRoot.querySelector('[data-ys-cwci-wizard-actions]'),
+        title: root.querySelector('[data-ys-cwci-wizard-title]'),
+        steps: [],
+        index: 0,
+        caps: null,
+        results: {},   // entity -> { exported, imported, errors, downloadUrl }
+        running: false,
+
+        boot(caps) {
+            this.caps = caps;
+            const flow = caps.can_direct_transfer ? 'direct' : (caps.can_export ? 'export' : (caps.can_import ? 'import' : 'none'));
+            this.flow = flow;
+            if (this.title) {
+                this.title.textContent = {
+                    direct: '同站搬家精靈（WooCommerce → YS CART）',
+                    export: '匯出精靈（來源站：打包 WooCommerce 資料）',
+                    import: '匯入精靈（目標站：匯入套件到 YS CART）',
+                    none: '此網站沒有 WooCommerce 也沒有 YS CART'
+                }[flow];
+            }
+            this.steps = this.buildSteps(flow);
+            this.index = 0;
+            this.render();
+        },
+
+        buildSteps(flow) {
+            const entitySteps = (kind) => ['customers', 'products', 'orders'].map((entity) => ({
+                key: `${kind}-${entity}`, title: `${entityLabels[entity]}`, kind, entity, skippable: true
+            }));
+            if (flow === 'direct') {
+                return [
+                    { key: 'env', title: '環境檢查', kind: 'env' },
+                    { key: 'backup', title: 'SQL 備份', kind: 'backup', skippable: true },
+                    ...entitySteps('direct'),
+                    { key: 'done', title: '完成', kind: 'done' }
+                ];
+            }
+            if (flow === 'export') {
+                return [
+                    { key: 'env', title: '環境檢查', kind: 'env' },
+                    ...entitySteps('export'),
+                    { key: 'done', title: '完成', kind: 'done' }
+                ];
+            }
+            if (flow === 'import') {
+                return [
+                    { key: 'env', title: '環境檢查', kind: 'env' },
+                    { key: 'backup', title: 'SQL 備份', kind: 'backup', skippable: true },
+                    ...entitySteps('import'),
+                    { key: 'done', title: '完成', kind: 'done' }
+                ];
+            }
+            return [{ key: 'env', title: '環境檢查', kind: 'env' }];
+        },
+
+        render() {
+            const step = this.steps[this.index];
+            this.rail.innerHTML = this.steps.map((s, i) => `
+                <li class="ys-cwci-wizard__step ${i === this.index ? 'is-current' : ''} ${i < this.index ? 'is-done' : ''}">
+                    <span class="ys-cwci-wizard__num">${i < this.index ? '✓' : i + 1}</span>
+                    <span>${escapeHtml(s.title)}</span>
+                </li>
+            `).join('');
+            this.renderPanel(step);
+            this.renderActions(step);
+        },
+
+        renderActions(step) {
+            const last = this.index >= this.steps.length - 1;
+            const parts = [];
+            if (this.index > 0 && !this.running) {
+                parts.push('<button type="button" class="ys-cwci-btn ys-cwci-btn--ghost" data-wz="prev">上一步</button>');
+            }
+            if (step.skippable && !this.running) {
+                parts.push('<button type="button" class="ys-cwci-btn ys-cwci-btn--ghost" data-wz="skip">略過</button>');
+            }
+            if (!last && !this.running && step.kind === 'env') {
+                parts.push('<button type="button" class="ys-cwci-btn ys-cwci-btn--primary" data-wz="next">開始 →</button>');
+            }
+            this.actions.innerHTML = parts.join('');
+        },
+
+        renderPanel(step) {
+            const p = this.panel;
+            if (step.kind === 'env') {
+                const c = this.caps;
+                const row = (label, on, okText, noText) => `
+                    <div class="ys-cwci-capability ${on ? 'is-ready' : 'is-muted'}">
+                        <span class="ys-cwci-capability__dot" aria-hidden="true"></span>
+                        <div><strong>${escapeHtml(label)}</strong><span>${escapeHtml(on ? okText : noText)}</span></div>
+                    </div>`;
+                const flowDesc = {
+                    direct: '本站同時有 WooCommerce 與 YS CART：精靈會依「客戶 → 商品 → 訂單」順序，逐項匯出並直接匯入本站。可重複執行，已搬過的資料不會重複。',
+                    export: '本站只有 WooCommerce：精靈會逐項打包成 ZIP 套件，完成後請下載並到目標站（裝有 YS CART）以匯入精靈上傳。',
+                    import: '本站只有 YS CART：請準備來源站匯出的 ZIP 套件，精靈會依正確順序引導你逐項上傳匯入。',
+                    none: '此網站偵測不到 WooCommerce 或 YS CART，無法使用搬家功能。'
+                }[this.flow];
+                p.innerHTML = `
+                    <div class="ys-cwci-capabilities">
+                        ${row('WooCommerce', !!c.woocommerce, '可匯出', '未啟用')}
+                        ${row('YS CART', !!c.ys_cart, '可匯入', '未啟用')}
+                        ${row('同站直接移轉', !!c.can_direct_transfer, '可用', '不可用')}
+                    </div>
+                    <p class="ys-cwci-wizard__desc">${escapeHtml(flowDesc)}</p>`;
+                return;
+            }
+            if (step.kind === 'backup') {
+                p.innerHTML = `
+                    <p class="ys-cwci-wizard__desc">匯入會寫入資料庫。<strong>強烈建議先建立 SQL 備份</strong>，若結果不符預期可在「手動模式」一鍵還原。</p>
+                    <button type="button" class="ys-cwci-btn ys-cwci-btn--primary" data-wz="backup">
+                        <span class="dashicons dashicons-database-export" aria-hidden="true"></span> 建立 SQL 備份並繼續
+                    </button>
+                    <div class="ys-cwci-wizard__log" data-wz-log hidden></div>`;
+                return;
+            }
+            if (step.kind === 'direct' || step.kind === 'export' || step.kind === 'import') {
+                const verb = { direct: '匯出並匯入', export: '匯出打包', import: '上傳並匯入' }[step.kind];
+                const uploadField = step.kind === 'import'
+                    ? `<label class="ys-cwci-field"><span>選擇 ${escapeHtml(entityLabels[step.entity])}套件（ZIP）</span><input type="file" accept=".zip" data-wz-file></label>`
+                    : '';
+                p.innerHTML = `
+                    <p class="ys-cwci-wizard__desc">第 ${this.index + 1} 步：${verb}「${escapeHtml(entityLabels[step.entity])}」。${step.kind === 'direct' ? '已存在的資料會自動略過或更新，不會重複。' : ''}</p>
+                    ${uploadField}
+                    <button type="button" class="ys-cwci-btn ys-cwci-btn--primary" data-wz="run-entity">
+                        <span class="dashicons dashicons-controls-play" aria-hidden="true"></span> 開始${verb}
+                    </button>
+                    <div class="ys-cwci-wizard__progress" data-wz-progress hidden>
+                        <div class="ys-cwci-progress"><span style="width:0%" data-wz-bar></span></div>
+                        <p data-wz-progress-text>準備中…</p>
+                    </div>
+                    <div class="ys-cwci-wizard__log" data-wz-log hidden></div>`;
+                return;
+            }
+            if (step.kind === 'done') {
+                const rows = Object.entries(this.results).map(([entity, r]) => `
+                    <li>
+                        <strong>${escapeHtml(entityLabels[entity] || entity)}</strong>：
+                        ${r.skipped ? '已略過' : `成功 ${Number(r.success || 0)} 筆、錯誤 ${Number(r.errors || 0)} 筆`}
+                        ${r.downloadUrl ? ` · <a href="${escapeHtml(r.downloadUrl)}">下載套件</a>` : ''}
+                        ${Number(r.errors || 0) > 0 ? ' · 詳見手動模式工作紀錄' : ''}
+                    </li>`).join('');
+                const wooNote = (this.caps && this.caps.woocommerce && this.flow !== 'export')
+                    ? '<li class="ys-cwci-guidance__warn"><strong>WooCommerce 仍啟用：</strong>驗證資料無誤後請停用 WooCommerce，再依「搬家指引」調整商品網址前綴。</li>'
+                    : '';
+                p.innerHTML = `
+                    <p class="ys-cwci-wizard__desc"><strong>${this.flow === 'export' ? '打包完成！' : '搬家完成！'}</strong></p>
+                    <ul class="ys-cwci-guidance">${rows || '<li>本次沒有執行任何項目。</li>'}${wooNote}</ul>
+                    <div class="ys-cwci-actions">
+                        <button type="button" class="ys-cwci-btn ys-cwci-btn--ghost" data-wz="restart">重新開始</button>
+                        <button type="button" class="ys-cwci-btn ys-cwci-btn--primary" data-wz="to-manual">查看工作紀錄（手動模式）</button>
+                    </div>`;
+                return;
+            }
+        },
+
+        log(msg) {
+            const el = this.panel.querySelector('[data-wz-log]');
+            if (el) {
+                el.hidden = false;
+                el.innerHTML += `<div>${escapeHtml(msg)}</div>`;
+            }
+        },
+
+        progress(pct, text) {
+            const wrap = this.panel.querySelector('[data-wz-progress]');
+            const bar = this.panel.querySelector('[data-wz-bar]');
+            const label = this.panel.querySelector('[data-wz-progress-text]');
+            if (wrap) { wrap.hidden = false; }
+            if (bar) { bar.style.width = `${Math.max(0, Math.min(100, pct))}%`; }
+            if (label) { label.textContent = text; }
+        },
+
+        async runJobToEnd(jobId, phaseLabel) {
+            for (let i = 0; i < 2000; i++) {
+                await api(`/ys-cart-wc-import/v1/jobs/${jobId}/run-next`, { method: 'POST' });
+                const job = await getJob(jobId);
+                const pct = progressOf(job);
+                this.progress(pct, `${phaseLabel}：已處理 ${Number(job.processed_count || 0)} 筆（成功 ${Number(job.success_count || 0)}、錯誤 ${Number(job.error_count || 0)}）`);
+                if (isTerminal(job.status)) {
+                    return job;
+                }
+                await pause(120);
+            }
+            throw new Error('執行逾時');
+        },
+
+        async runEntityStep(step, button) {
+            if (this.running) { return; }
+            this.running = true;
+            setBusy(button, true);
+            this.renderActions(step);
+            const entity = step.entity;
+            try {
+                if (step.kind === 'export' || step.kind === 'direct') {
+                    this.progress(0, '建立匯出工作…');
+                    const exportJob = await api('/ys-cart-wc-import/v1/export-jobs', { method: 'POST', data: { entity, options: {} } });
+                    const doneExport = await this.runJobToEnd(Number(exportJob.id), `匯出${entityLabels[entity]}`);
+                    if (String(doneExport.status) !== 'completed') {
+                        throw new Error(`匯出未完成（${statusLabels[doneExport.status] || doneExport.status}）`);
+                    }
+                    this.log(`匯出完成：成功 ${Number(doneExport.success_count || 0)} 筆`);
+                    if (step.kind === 'export') {
+                        const downloadUrl = `${window.ysCwciAdmin.restUrl}/jobs/${Number(doneExport.id)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}`;
+                        this.results[entity] = { success: Number(doneExport.success_count || 0), errors: Number(doneExport.error_count || 0), downloadUrl };
+                        this.log('套件已就緒，可於完成頁下載。');
+                    } else {
+                        this.progress(0, '建立匯入工作…');
+                        const importJob = await api('/ys-cart-wc-import/v1/import-jobs', {
+                            method: 'POST',
+                            data: { entity, options: { file_path: String(doneExport.file_path || ''), source_fingerprint: String(window.ysCwciAdmin.siteFingerprint || '') } }
+                        });
+                        const doneImport = await this.runJobToEnd(Number(importJob.id), `匯入${entityLabels[entity]}`);
+                        if (String(doneImport.status) !== 'completed') {
+                            throw new Error(`匯入未完成（${statusLabels[doneImport.status] || doneImport.status}）`);
+                        }
+                        this.results[entity] = { success: Number(doneImport.success_count || 0), errors: Number(doneImport.error_count || 0) };
+                        this.log(`匯入完成：成功 ${Number(doneImport.success_count || 0)} 筆、錯誤 ${Number(doneImport.error_count || 0)} 筆`);
+                    }
+                } else if (step.kind === 'import') {
+                    const fileInput = this.panel.querySelector('[data-wz-file]');
+                    if (!fileInput || !fileInput.files || !fileInput.files.length) {
+                        throw new Error('請先選擇套件 ZIP 檔。');
+                    }
+                    this.progress(0, '上傳套件…');
+                    const formData = new FormData();
+                    formData.append('package', fileInput.files[0]);
+                    formData.append('entity', entity);
+                    const uploadResponse = await fetch(`${window.ysCwciAdmin.restUrl}/packages/upload`, {
+                        method: 'POST', credentials: 'same-origin',
+                        headers: { 'X-WP-Nonce': window.ysCwciAdmin.nonce }, body: formData
+                    });
+                    const packageInfo = await uploadResponse.json();
+                    if (packageInfo.code) { throw new Error(packageInfo.message || '上傳失敗。'); }
+                    this.log(`套件已上傳（來源：${packageInfo.manifest?.source?.site_url || '來源站'}）`);
+                    const importJob = await api('/ys-cart-wc-import/v1/import-jobs', {
+                        method: 'POST',
+                        data: { entity, options: { file_path: packageInfo.file_path, source_fingerprint: packageInfo.manifest.source.site_url_hash } }
+                    });
+                    const doneImport = await this.runJobToEnd(Number(importJob.id), `匯入${entityLabels[entity]}`);
+                    if (String(doneImport.status) !== 'completed') {
+                        throw new Error(`匯入未完成（${statusLabels[doneImport.status] || doneImport.status}）`);
+                    }
+                    this.results[entity] = { success: Number(doneImport.success_count || 0), errors: Number(doneImport.error_count || 0) };
+                    this.log(`匯入完成：成功 ${Number(doneImport.success_count || 0)} 筆、錯誤 ${Number(doneImport.error_count || 0)} 筆`);
+                }
+                this.running = false;
+                await loadJobs();
+                this.next();
+            } catch (error) {
+                this.running = false;
+                setBusy(button, false);
+                this.log(`發生錯誤：${error.message || error}`);
+                this.progress(0, '已停止，可修正後重試或略過此步。');
+                this.renderActions(step);
+            }
+        },
+
+        next() { if (this.index < this.steps.length - 1) { this.index++; this.render(); } },
+        prev() { if (this.index > 0 && !this.running) { this.index--; this.render(); } },
+        skip() {
+            const step = this.steps[this.index];
+            if (step.entity) { this.results[step.entity] = { skipped: true }; }
+            this.next();
+        }
+    } : null;
+
+    if (wizardRoot && wizard) {
+        wizardRoot.addEventListener('click', async (event) => {
+            const btn = event.target.closest('[data-wz]');
+            if (!btn) { return; }
+            const action = btn.getAttribute('data-wz');
+            const step = wizard.steps[wizard.index];
+            if (action === 'next') { wizard.next(); }
+            if (action === 'prev') { wizard.prev(); }
+            if (action === 'skip') { wizard.skip(); }
+            if (action === 'restart') { wizard.results = {}; wizard.index = 0; wizard.render(); }
+            if (action === 'to-manual') { applyMode('manual'); }
+            if (action === 'backup') {
+                setBusy(btn, true);
+                try {
+                    const result = await api('/ys-cart-wc-import/v1/backups', { method: 'POST' });
+                    if (result.error) { throw new Error(result.message || '建立備份失敗。'); }
+                    wizard.log(`備份已建立：${result.backup?.file || ''}`);
+                    await loadBackups();
+                    wizard.next();
+                } catch (error) {
+                    wizard.log(`備份失敗：${error.message || error}`);
+                    setBusy(btn, false);
+                }
+            }
+            if (action === 'run-entity') {
+                wizard.runEntityStep(step, btn);
+            }
+        });
+    }
+
+    let storedMode = 'wizard';
+    try { storedMode = window.localStorage.getItem(MODE_KEY) || 'wizard'; } catch (e) { /* 預設精靈 */ }
+    applyMode(storedMode);
+
+    Promise.all([loadCapabilities(), loadJobs(), loadBackups()]).then(() => {
+        // 精靈需要 capabilities 決定流程 — 再抓一次（renderCapabilities 沒回傳資料）
+        return api('/ys-cart-wc-import/v1/capabilities');
+    }).then((caps) => {
+        if (wizard) { wizard.boot(caps); }
+    }).catch(() => {
+        if (wizard && wizard.panel) {
+            wizard.panel.innerHTML = '<div class="ys-cwci-alert is-error">無法讀取環境狀態，請改用手動模式。</div>';
+        }
+    });
 
     window.setInterval(() => {
         if (!document.hidden && !autoRunningJobId) {

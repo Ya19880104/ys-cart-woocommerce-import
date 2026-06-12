@@ -33,6 +33,7 @@ $tests = [
     // (which throw on failure instead of exit) go ABOVE this line.
     'static/stability-hardening-v050.php',
     'static/migration-guidance-v051.php',
+    'static/wizard-mode-v060.php',
     'static/security-hardening-v024.php',
 ];
 
