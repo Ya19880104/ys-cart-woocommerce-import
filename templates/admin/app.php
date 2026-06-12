@@ -41,6 +41,77 @@ if (!$ys_cwci_chrome) {
             </div>
         </section>
 
+        <?php
+        // v0.5.1：網址與 slug 移轉指引（server-side 偵測、無 JS 依賴）。
+        $ys_cwci_woo_active = class_exists('WooCommerce');
+        $ys_cwci_has_yscart = class_exists('\YangSheep\Ecommerce\YSEcommerce')
+            || defined('YS_ECOMMERCE_TABLE_PREFIX');
+        $ys_cwci_ys_base = 'shop';
+        if (
+            class_exists('\YangSheep\Ecommerce\Bootstrap\YSShopRoutingBootstrap')
+            && method_exists('\YangSheep\Ecommerce\Bootstrap\YSShopRoutingBootstrap', 'route_base')
+        ) {
+            // YS CART >= 2.52.29 才有可設定前綴；舊版固定 shop。
+            $ys_cwci_ys_base = (string) \YangSheep\Ecommerce\Bootstrap\YSShopRoutingBootstrap::route_base();
+        }
+        $ys_cwci_woo_base = 'product';
+        if ($ys_cwci_woo_active) {
+            $ys_cwci_woo_permalinks = (array) get_option('woocommerce_permalinks', []);
+            $ys_cwci_woo_base = trim((string) ($ys_cwci_woo_permalinks['product_base'] ?? 'product'), '/');
+            if ($ys_cwci_woo_base === '') {
+                $ys_cwci_woo_base = 'product';
+            }
+        }
+        ?>
+        <section class="ys-cwci-card<?php echo $ys_cwci_woo_active && $ys_cwci_has_yscart ? ' ys-cwci-card--accent' : ''; ?>">
+            <div class="ys-cwci-card__head">
+                <div>
+                    <p class="ys-cwci-kicker"><?php echo esc_html__('搬家指引', 'ys-cart-woocommerce-import'); ?></p>
+                    <h2><?php echo esc_html__('網址與商品代稱（slug）', 'ys-cart-woocommerce-import'); ?></h2>
+                </div>
+            </div>
+            <ul class="ys-cwci-guidance">
+                <li>
+                    <?php echo esc_html__('匯入會原樣保留 WooCommerce 的商品代稱（slug）與 SKU，商品在 YS CART 的網址為 /', 'ys-cart-woocommerce-import'); ?><code><?php echo esc_html($ys_cwci_ys_base); ?></code><?php echo esc_html__('/{商品代稱}/。', 'ys-cart-woocommerce-import'); ?>
+                </li>
+                <?php if ($ys_cwci_woo_active) : ?>
+                    <li class="ys-cwci-guidance__warn">
+                        <strong><?php echo esc_html__('WooCommerce 目前仍啟用：', 'ys-cart-woocommerce-import'); ?></strong>
+                        <?php echo esc_html__('YS CART 商品連結的 ?product= 查詢參數會被 WooCommerce 商品文章類型攔截（開到舊商品或 404）。完成匯入並驗證資料後，請停用 WooCommerce。', 'ys-cart-woocommerce-import'); ?>
+                        <?php if ($ys_cwci_has_yscart && $ys_cwci_ys_base === $ys_cwci_woo_base) : ?>
+                            <strong><?php echo esc_html__('另外：YS CART 商品網址前綴目前與 WooCommerce 商品路徑相同，YS CART 規則優先，所有 WooCommerce 商品網址將 404。', 'ys-cart-woocommerce-import'); ?></strong>
+                        <?php endif; ?>
+                    </li>
+                <?php endif; ?>
+                <?php if ($ys_cwci_has_yscart) : ?>
+                    <li>
+                        <?php
+                        printf(
+                            /* translators: %s = WooCommerce product permalink base */
+                            esc_html__('想沿用 WooCommerce 的 /%s/{商品代稱}/ 商品網址：停用 WooCommerce 後，到「商店設定 → 功能模組 → 商品網址前綴」改為相同字串並儲存即可（需 YS CART 2.52.29+）。', 'ys-cart-woocommerce-import'),
+                            esc_html($ys_cwci_woo_base)
+                        );
+                        ?>
+                    </li>
+                <?php endif; ?>
+                <li><?php echo esc_html__('提醒：舊分類、標籤與封存頁網址不會自動轉址，請依 SEO 需求另行規劃 301。', 'ys-cart-woocommerce-import'); ?></li>
+            </ul>
+            <div class="ys-cwci-actions">
+                <?php if ($ys_cwci_has_yscart) : ?>
+                    <a class="ys-cwci-btn ys-cwci-btn--ghost" href="<?php echo esc_url(admin_url('admin.php?page=ys-ec-settings&tab=shop')); ?>">
+                        <span class="dashicons dashicons-admin-links" aria-hidden="true"></span>
+                        <?php echo esc_html__('商店設定（商品網址前綴）', 'ys-cart-woocommerce-import'); ?>
+                    </a>
+                <?php endif; ?>
+                <?php if ($ys_cwci_woo_active) : ?>
+                    <a class="ys-cwci-btn ys-cwci-btn--ghost" href="<?php echo esc_url(admin_url('plugins.php')); ?>">
+                        <span class="dashicons dashicons-admin-plugins" aria-hidden="true"></span>
+                        <?php echo esc_html__('前往外掛頁停用 WooCommerce', 'ys-cart-woocommerce-import'); ?>
+                    </a>
+                <?php endif; ?>
+            </div>
+        </section>
+
         <div class="ys-cwci-grid">
             <section class="ys-cwci-card">
                 <div class="ys-cwci-card__head">

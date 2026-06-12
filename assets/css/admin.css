@@ -494,6 +494,38 @@
     }
 }
 
+/* v0.5.1：網址與 slug 搬家指引 */
+.ys-cwci-guidance {
+    display: grid;
+    gap: 10px;
+    margin: 0 0 14px;
+    padding: 0;
+    list-style: none;
+}
+
+.ys-cwci-guidance li {
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid #e3eaf3;
+    border-radius: 8px;
+    background: #f8fafd;
+    color: #33475f;
+    font-size: 13px;
+    line-height: 1.65;
+}
+
+.ys-cwci-guidance li code {
+    background: #eef3fa;
+    border-radius: 4px;
+    padding: 1px 5px;
+}
+
+.ys-cwci-guidance__warn {
+    border-color: #f3d8a8 !important;
+    background: #fdf6e8 !important;
+    color: #7a5618 !important;
+}
+
 /* v0.5.0 UI：包在 YS CART YSAdminApp takeover shell 內時的視覺調和。
    只在偵測到 YS CART 時加上 .ys-cwci-admin--ysca（純匯出站不套用、維持獨立外觀）。
    核心 ysca token 此時已載入，以 var(--ysca-*) 對齊主色／邊框／圓角，bespoke 值作 fallback。 */

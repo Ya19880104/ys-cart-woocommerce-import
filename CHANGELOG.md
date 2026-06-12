@@ -5,6 +5,27 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.5.1] - 2026-06-12 — URL & slug migration guidance
+
+### Added
+
+- **「網址與商品代稱（slug）」搬家指引卡** on the admin page (server-rendered, no JS
+  dependency). It explains that imports keep Woo slugs/SKUs verbatim, shows the
+  resulting YS CART product URL base, and adapts to the live environment:
+  - When **WooCommerce is still active**: warns that YS CART's `?product=` query
+    parameter is hijacked by the WooCommerce product post type (old product page
+    or 404), with a stronger warning when the YS CART product URL base collides
+    with WooCommerce's product permalink base (YS rules win → every Woo product
+    URL 404s). Includes a shortcut to the plugins page to deactivate WooCommerce
+    after the migration is verified.
+  - When **YS CART is present**: explains how to keep the original
+    `/product/{slug}/` URLs after deactivating WooCommerce via 商店設定 → 功能模組
+    → 商品網址前綴 (requires YS CART 2.52.29+), with a shortcut button. Detects
+    the configurable base via `YSShopRoutingBootstrap::route_base()` when
+    available and falls back to `shop` on older cores.
+  - Always: reminder that category/tag/archive URLs are not auto-redirected
+    (plan 301s separately).
+
 ## [0.5.0] - 2026-06-12 — Stability & UI hardening
 
 Pre-sale review pass (priority: security > performance > function). No data-model
