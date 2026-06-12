@@ -212,10 +212,16 @@ if (!$ys_cwci_chrome) {
                             <option value="orders"><?php echo esc_html__('訂單', 'ys-cart-woocommerce-import'); ?></option>
                         </select>
                     </label>
+                    <fieldset class="ys-cwci-field ys-cwci-field--radios">
+                        <span><?php echo esc_html__('已匯入過的資料', 'ys-cart-woocommerce-import'); ?></span>
+                        <label><input type="radio" name="mode" value="skip" checked> <?php echo esc_html__('忽略已匯入', 'ys-cart-woocommerce-import'); ?></label>
+                        <label><input type="radio" name="mode" value="overwrite"> <?php echo esc_html__('覆蓋已匯入', 'ys-cart-woocommerce-import'); ?></label>
+                    </fieldset>
                     <button type="submit" class="ys-cwci-btn ys-cwci-btn--primary">
                         <span class="dashicons dashicons-upload" aria-hidden="true"></span>
                         <?php echo esc_html__('上傳並匯入', 'ys-cart-woocommerce-import'); ?>
                     </button>
+                    <p class="ys-cwci-import-form__note"><?php echo esc_html__('可依序匯入多個不同來源站的套件 — 訂單以「來源站＋來源單號」辨識，不同站的同號訂單不會互相覆蓋。訂單匯入前會列出狀態供勾選（預設全選）。', 'ys-cart-woocommerce-import'); ?></p>
                 </form>
                 <div class="ys-cwci-result" data-ys-cwci-upload-result hidden></div>
             </section>

@@ -88,6 +88,13 @@ final class RestController
             'permission_callback' => [Permission::class, 'admin'],
         ]);
 
+        // v0.7.0：訂單狀態掃描（狀態選擇 + 未對應詢問 UI 的資料來源）
+        register_rest_route(self::NAMESPACE, '/packages/order-statuses', [
+            'methods' => 'POST',
+            'callback' => [new PackageController(), 'orderStatuses'],
+            'permission_callback' => [Permission::class, 'admin'],
+        ]);
+
         register_rest_route(self::NAMESPACE, '/backups', [
             'methods' => 'GET',
             'callback' => [new BackupController(), 'list'],

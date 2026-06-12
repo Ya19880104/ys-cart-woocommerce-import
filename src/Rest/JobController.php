@@ -70,6 +70,37 @@ final class JobController
             }
         }
 
+        // v0.7.0：匯入模式 + 訂單狀態控制（全部 allowlist 驗證、壞值剔除不報錯）。
+        if (isset($options['mode'])) {
+            $mode = sanitize_key((string)$options['mode']);
+            if (in_array($mode, ['skip', 'overwrite', 'update'], true)) {
+                $options['mode'] = $mode;
+            } else {
+                unset($options['mode']);
+            }
+        }
+        if (isset($options['status_include'])) {
+            $include = [];
+            foreach ((array)$options['status_include'] as $status) {
+                $status = sanitize_key((string)$status);
+                if ($status !== '') {
+                    $include[] = $status;
+                }
+            }
+            $options['status_include'] = array_values(array_unique($include));
+        }
+        if (isset($options['status_map'])) {
+            $map = [];
+            foreach ((array)$options['status_map'] as $from => $to) {
+                $from = sanitize_key((string)$from);
+                $to = sanitize_key((string)$to);
+                if ($from !== '' && in_array($to, \YangSheep\YsCartWooImport\YsCart\OrderMapper::YS_STATUSES, true)) {
+                    $map[$from] = $to;
+                }
+            }
+            $options['status_map'] = $map;
+        }
+
         $jobId = (new JobRepository())->create('import', $entity, $options, get_current_user_id());
         (new Scheduler())->enqueue($jobId);
 

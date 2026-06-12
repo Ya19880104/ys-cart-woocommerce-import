@@ -639,6 +639,132 @@
     gap: 8px;
 }
 
+/* v0.7.0：中斷繼續 banner */
+.ys-cwci-resume {
+    display: grid;
+    gap: 8px;
+    padding: 14px 16px;
+    border: 1.5px solid #f3d8a8;
+    border-radius: 8px;
+    background: #fdf6e8;
+    color: #7a5618;
+}
+
+.ys-cwci-resume strong {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.ys-cwci-resume span {
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+/* v0.7.0：覆蓋/忽略 radio 群 */
+.ys-cwci-wizard__mode,
+.ys-cwci-field--radios {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid #e3eaf3;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.ys-cwci-wizard__mode legend,
+.ys-cwci-field--radios > span {
+    font-size: 12px;
+    font-weight: 700;
+    color: #31506f;
+    padding: 0 4px;
+}
+
+.ys-cwci-wizard__mode label,
+.ys-cwci-field--radios label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #33475f;
+}
+
+.ys-cwci-import-form__note {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #5e7188;
+    line-height: 1.6;
+}
+
+/* v0.7.0：訂單狀態選擇（預設全選 + 未對應詢問） */
+.ys-cwci-status-pick {
+    display: grid;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid #e3eaf3;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.ys-cwci-status-pick > strong {
+    font-size: 13px;
+    color: #102033;
+}
+
+.ys-cwci-status-pick ul {
+    display: grid;
+    gap: 6px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ys-cwci-status-pick__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+    padding: 7px 10px;
+    border: 1px solid #eef3fa;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.ys-cwci-status-pick__row.is-unmapped-row {
+    border-color: #f3d8a8;
+    background: #fdf6e8;
+}
+
+.ys-cwci-status-pick__row label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.ys-cwci-status-pick__count {
+    color: #5e7188;
+    font-size: 12px;
+}
+
+.ys-cwci-status-pick__map {
+    color: #2e9b6b;
+    font-size: 12px;
+}
+
+.ys-cwci-status-pick__map.is-unmapped {
+    color: #b3650f;
+    font-weight: 700;
+}
+
+.ys-cwci-status-pick .ys-cwci-btn {
+    justify-self: start;
+}
+
 /* v0.5.1：網址與 slug 搬家指引 */
 .ys-cwci-guidance {
     display: grid;

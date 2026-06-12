@@ -461,11 +461,81 @@
         }
     });
 
+    /* v0.7.0 手動模式：建立匯入工作（含 mode 與訂單狀態選項） */
+    const manualCreateImport = (entity, fileInfo, mode, statusSel, button) => {
+        const options = {
+            file_path: fileInfo.file_path,
+            source_fingerprint: fileInfo.fingerprint,
+            mode: mode === 'overwrite' ? 'overwrite' : 'skip'
+        };
+        if (entity === 'orders' && statusSel) {
+            if (Array.isArray(statusSel.include) && statusSel.include.length) { options.status_include = statusSel.include; }
+            if (statusSel.map && Object.keys(statusSel.map).length) { options.status_map = statusSel.map; }
+        }
+        setStatus('建立匯入工作');
+        return api('/ys-cart-wc-import/v1/import-jobs', { method: 'POST', data: { entity, options } })
+            .then((job) => {
+                const jobId = Number(job?.id || 0);
+                setStatus(`${entityLabels[entity] || entity} 匯入工作已建立，開始自動執行`);
+                return loadJobs().then(() => (jobId > 0 ? autoRun(jobId, button) : undefined));
+            });
+    };
+
+    /* v0.7.0 手動模式：訂單狀態選擇（預設全選；未對應狀態詢問對應） */
+    const manualRenderStatusPicker = (data, fileInfo, mode) => {
+        if (!uploadResult) { return; }
+        const statuses = Array.isArray(data.statuses) ? data.statuses : [];
+        const ysStatuses = Array.isArray(data.ys_statuses) ? data.ys_statuses : [];
+        const options = ysStatuses.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+        const rows = statuses.map((row) => {
+            const status = String(row.status || '');
+            const mapped = row.mapped_to ? String(row.mapped_to) : '';
+            const mapCell = mapped
+                ? `<span class="ys-cwci-status-pick__map">→ ${escapeHtml(mapped)}</span>`
+                : `<span class="ys-cwci-status-pick__map is-unmapped">⚠ 未對應，請選擇：</span>
+                   <select data-manual-map="${escapeHtml(status)}">${options}</select>`;
+            return `
+                <li class="ys-cwci-status-pick__row ${mapped ? '' : 'is-unmapped-row'}">
+                    <label>
+                        <input type="checkbox" data-manual-st value="${escapeHtml(status)}" checked>
+                        <strong>${escapeHtml(status)}</strong>
+                        <span class="ys-cwci-status-pick__count">${Number(row.count || 0)} 筆</span>
+                    </label>
+                    ${mapCell}
+                </li>`;
+        }).join('');
+        uploadResult.hidden = false;
+        uploadResult.innerHTML = `
+            <div class="ys-cwci-status-pick">
+                <strong>選擇要匯入的訂單狀態（預設全選）</strong>
+                <ul>${rows}</ul>
+                <button type="button" class="ys-cwci-btn ys-cwci-btn--primary" data-ys-cwci-manual-import>確認並開始匯入</button>
+            </div>`;
+        const confirmButton = uploadResult.querySelector('[data-ys-cwci-manual-import]');
+        confirmButton.addEventListener('click', () => {
+            const boxes = Array.from(uploadResult.querySelectorAll('[data-manual-st]'));
+            const checked = boxes.filter((box) => box.checked).map((box) => String(box.value));
+            const include = (checked.length === boxes.length) ? [] : checked; // 全選＝不過濾
+            const map = {};
+            uploadResult.querySelectorAll('[data-manual-map]').forEach((select) => {
+                map[String(select.getAttribute('data-manual-map'))] = String(select.value);
+            });
+            uploadResult.innerHTML = '<strong>開始匯入…</strong>';
+            manualCreateImport('orders', fileInfo, mode, { include, map }, confirmButton)
+                .catch((error) => {
+                    uploadResult.textContent = error.message || '匯入失敗。';
+                    setStatus(error.message || '匯入工作建立失敗');
+                });
+        }, { once: true });
+    };
+
     if (uploadForm) {
         uploadForm.addEventListener('submit', (event) => {
             event.preventDefault();
             const data = new FormData(uploadForm);
             const entity = data.get('entity');
+            const mode = String(data.get('mode') || 'skip'); // v0.7.0 覆蓋/忽略
+            data.delete('mode'); // upload 端點不需要
             const submitButton = uploadForm.querySelector('button[type="submit"]');
 
             setBusy(submitButton, true);
@@ -494,27 +564,29 @@
                         `;
                     }
 
-                    setStatus('套件已上傳，建立匯入工作');
-                    return api('/ys-cart-wc-import/v1/import-jobs', {
-                        method: 'POST',
-                        data: {
-                            entity,
-                            options: {
-                                file_path: packageInfo.file_path,
-                                source_fingerprint: packageInfo.manifest.source.site_url_hash
+                    const fileInfo = {
+                        file_path: packageInfo.file_path,
+                        fingerprint: packageInfo.manifest.source.site_url_hash
+                    };
+
+                    // v0.7.0：訂單先列出狀態供勾選（預設全選），未對應狀態詢問對應後才匯入。
+                    if (entity === 'orders') {
+                        setStatus('掃描套件內的訂單狀態');
+                        return api('/ys-cart-wc-import/v1/packages/order-statuses', {
+                            method: 'POST',
+                            data: { file_path: fileInfo.file_path }
+                        }).then((statusData) => {
+                            const list = Array.isArray(statusData.statuses) ? statusData.statuses : [];
+                            if (!list.length) {
+                                return manualCreateImport(entity, fileInfo, mode, null, submitButton);
                             }
-                        }
-                    });
-                })
-                .then((job) => {
-                    const jobId = Number(job?.id || 0);
-                    setStatus(`${entityLabels[entity] || entity} 匯入工作已建立，開始自動執行`);
-                    return loadJobs().then(() => {
-                        if (jobId > 0) {
-                            return autoRun(jobId, submitButton);
-                        }
-                        return undefined;
-                    });
+                            manualRenderStatusPicker(statusData, fileInfo, mode);
+                            setStatus('請選擇要匯入的訂單狀態');
+                            return undefined;
+                        });
+                    }
+
+                    return manualCreateImport(entity, fileInfo, mode, null, submitButton);
                 })
                 .catch((error) => {
                     if (uploadResult) {
@@ -528,14 +600,20 @@
         });
     }
 
-    /* ─────────────────────────────────────────────
+        /* ─────────────────────────────────────────────
        v0.6.0 精靈模式（步驟式引導）＋ 模式切換
+       v0.7.0 中斷繼續、全部重試（覆蓋/忽略）、訂單狀態選擇與未對應詢問
        手動模式 = 既有工程化 UI（上方全部程式不動）。
        ───────────────────────────────────────────── */
 
     const MODE_KEY = 'ys_cwci_mode';
+    const STATE_KEY = 'ys_cwci_wizard_state';
     const modeTabs = root.querySelectorAll('[data-ys-cwci-mode]');
     const modePanels = root.querySelectorAll('[data-ys-cwci-mode-panel]');
+
+    const safeParse = (raw) => {
+        try { const v = JSON.parse(String(raw || '')); return (v && typeof v === 'object') ? v : null; } catch (e) { return null; }
+    };
 
     const applyMode = (mode) => {
         const target = mode === 'manual' ? 'manual' : 'wizard';
@@ -562,8 +640,32 @@
         steps: [],
         index: 0,
         caps: null,
-        results: {},   // entity -> { exported, imported, errors, downloadUrl }
+        results: {},        // entity -> { success, errors, skippedCount, downloadUrl, skipped }
         running: false,
+        autopilot: false,   // v0.7.0 全部重試自動逐步
+        retryMode: 'skip',  // v0.7.0 忽略已匯入(skip) / 覆蓋已匯入(overwrite)
+        ordersStatus: null, // v0.7.0 訂單狀態選擇 { include:[], map:{} }
+        pendingResume: null,
+        _statusResolve: null,
+
+        /* ── v0.7.0 進度持久化（中斷繼續） ── */
+        saveState() {
+            try {
+                window.localStorage.setItem(STATE_KEY, JSON.stringify({
+                    v: 1, flow: this.flow, index: this.index, results: this.results,
+                    retryMode: this.retryMode, ordersStatus: this.ordersStatus, ts: Date.now()
+                }));
+            } catch (e) { /* 無 storage 不阻擋 */ }
+        },
+        clearState() {
+            try { window.localStorage.removeItem(STATE_KEY); } catch (e) { /* noop */ }
+        },
+        loadState() {
+            try {
+                const obj = safeParse(window.localStorage.getItem(STATE_KEY));
+                return (obj && obj.v === 1) ? obj : null;
+            } catch (e) { return null; }
+        },
 
         boot(caps) {
             this.caps = caps;
@@ -580,6 +682,25 @@
             this.steps = this.buildSteps(flow);
             this.index = 0;
             this.render();
+        },
+
+        /* v0.7.0 開機掃描：localStorage 進度 + 未完成的精靈工作 → 顯示「繼續上次進度」 */
+        async bootWithResume(caps) {
+            this.boot(caps);
+            let saved = this.loadState();
+            if (saved && saved.flow !== this.flow) { saved = null; }
+            let unfinished = [];
+            try {
+                const items = await api('/ys-cart-wc-import/v1/jobs');
+                unfinished = (Array.isArray(items) ? items : [])
+                    .filter((job) => !isTerminal(job.status))
+                    .map((job) => ({ ...job, opts: safeParse(job.options_json) || {} }))
+                    .filter((job) => job.opts.wizard);
+            } catch (e) { /* 讀不到工作不阻擋精靈 */ }
+            if (saved || unfinished.length) {
+                this.pendingResume = { saved, unfinished };
+                this.render();
+            }
         },
 
         buildSteps(flow) {
@@ -639,6 +760,24 @@
             this.actions.innerHTML = parts.join('');
         },
 
+        /* v0.7.0 覆蓋/忽略 radio（direct / import 步驟用） */
+        modeRadioHtml(step) {
+            const name = `wz-mode-${step.key}`;
+            const skipChecked = this.retryMode !== 'overwrite' ? 'checked' : '';
+            const overChecked = this.retryMode === 'overwrite' ? 'checked' : '';
+            return `
+                <fieldset class="ys-cwci-wizard__mode">
+                    <legend>已匯入過的資料</legend>
+                    <label><input type="radio" name="${name}" data-wz-mode value="skip" ${skipChecked}> 忽略已匯入（不更動既有資料）</label>
+                    <label><input type="radio" name="${name}" data-wz-mode value="overwrite" ${overChecked}> 覆蓋已匯入（以套件資料更新）</label>
+                </fieldset>`;
+        },
+
+        panelMode() {
+            const checked = this.panel.querySelector('[data-wz-mode]:checked');
+            return checked ? String(checked.value) : 'skip';
+        },
+
         renderPanel(step) {
             const p = this.panel;
             if (step.kind === 'env') {
@@ -651,10 +790,21 @@
                 const flowDesc = {
                     direct: '本站同時有 WooCommerce 與 YS CART：精靈會依「客戶 → 商品 → 訂單」順序，逐項匯出並直接匯入本站。可重複執行，已搬過的資料不會重複。',
                     export: '本站只有 WooCommerce：精靈會逐項打包成 ZIP 套件，完成後請下載並到目標站（裝有 YS CART）以匯入精靈上傳。',
-                    import: '本站只有 YS CART：請準備來源站匯出的 ZIP 套件，精靈會依正確順序引導你逐項上傳匯入。',
+                    import: '本站只有 YS CART：請準備來源站匯出的 ZIP 套件，精靈會依正確順序引導你逐項上傳匯入。可依序匯入多個不同來源站的套件 — 訂單以「來源站＋來源單號」辨識，不會互相覆蓋。',
                     none: '此網站偵測不到 WooCommerce 或 YS CART，無法使用搬家功能。'
                 }[this.flow];
+                const resume = this.pendingResume;
+                const resumeHtml = resume ? `
+                    <div class="ys-cwci-resume" data-wz-resume>
+                        <strong><span class="dashicons dashicons-backup" aria-hidden="true"></span> 偵測到上次中斷的搬家進度</strong>
+                        <span>${resume.saved ? `上次停在第 ${Number(resume.saved.index || 0) + 1} 步` : ''}${resume.unfinished.length ? `${resume.saved ? '，' : ''}未完成工作：${resume.unfinished.map((job) => `#${Number(job.id)} ${escapeHtml(typeLabels[job.type] || job.type)}${escapeHtml(entityLabels[job.entity] || job.entity)}（已處理 ${Number(job.processed_count || 0)} 筆）`).join('、')}` : ''}</span>
+                        <div class="ys-cwci-actions">
+                            <button type="button" class="ys-cwci-btn ys-cwci-btn--primary" data-wz="resume">繼續上次進度</button>
+                            <button type="button" class="ys-cwci-btn ys-cwci-btn--ghost" data-wz="discard">放棄並重新開始</button>
+                        </div>
+                    </div>` : '';
                 p.innerHTML = `
+                    ${resumeHtml}
                     <div class="ys-cwci-capabilities">
                         ${row('WooCommerce', !!c.woocommerce, '可匯出', '未啟用')}
                         ${row('YS CART', !!c.ys_cart, '可匯入', '未啟用')}
@@ -677,9 +827,19 @@
                 const uploadField = step.kind === 'import'
                     ? `<label class="ys-cwci-field"><span>選擇 ${escapeHtml(entityLabels[step.entity])}套件（ZIP）</span><input type="file" accept=".zip" data-wz-file></label>`
                     : '';
+                const modeField = step.kind !== 'export' ? this.modeRadioHtml(step) : '';
+                const crossSiteNote = (step.kind === 'import' && step.entity === 'orders')
+                    ? '<p class="ys-cwci-wizard__desc">可依序匯入多個不同來源站的訂單套件 — 系統以「來源站＋來源單號」辨識，不同站的同號訂單不會互相覆蓋。</p>'
+                    : '';
+                const statusNote = (step.entity === 'orders' && step.kind !== 'export')
+                    ? '<p class="ys-cwci-wizard__desc">開始後會先列出套件內的訂單狀態供勾選（預設全選）；無法自動對應的狀態會詢問要對應到哪個 YS CART 狀態。</p>'
+                    : '';
                 p.innerHTML = `
-                    <p class="ys-cwci-wizard__desc">第 ${this.index + 1} 步：${verb}「${escapeHtml(entityLabels[step.entity])}」。${step.kind === 'direct' ? '已存在的資料會自動略過或更新，不會重複。' : ''}</p>
+                    <p class="ys-cwci-wizard__desc">第 ${this.index + 1} 步：${verb}「${escapeHtml(entityLabels[step.entity])}」。${step.kind === 'direct' ? '已存在的資料依下方選項處理。' : ''}</p>
+                    ${crossSiteNote}
+                    ${statusNote}
                     ${uploadField}
+                    ${modeField}
                     <button type="button" class="ys-cwci-btn ys-cwci-btn--primary" data-wz="run-entity">
                         <span class="dashicons dashicons-controls-play" aria-hidden="true"></span> 開始${verb}
                     </button>
@@ -687,6 +847,7 @@
                         <div class="ys-cwci-progress"><span style="width:0%" data-wz-bar></span></div>
                         <p data-wz-progress-text>準備中…</p>
                     </div>
+                    <div data-wz-status-wrap></div>
                     <div class="ys-cwci-wizard__log" data-wz-log hidden></div>`;
                 return;
             }
@@ -694,19 +855,27 @@
                 const rows = Object.entries(this.results).map(([entity, r]) => `
                     <li>
                         <strong>${escapeHtml(entityLabels[entity] || entity)}</strong>：
-                        ${r.skipped ? '已略過' : `成功 ${Number(r.success || 0)} 筆、錯誤 ${Number(r.errors || 0)} 筆`}
+                        ${r.skipped ? '已略過' : `成功 ${Number(r.success || 0)} 筆、錯誤 ${Number(r.errors || 0)} 筆${Number(r.skippedCount || 0) > 0 ? `、狀態略過 ${Number(r.skippedCount)} 筆` : ''}`}
                         ${r.downloadUrl ? ` · <a href="${escapeHtml(r.downloadUrl)}">下載套件</a>` : ''}
                         ${Number(r.errors || 0) > 0 ? ' · 詳見手動模式工作紀錄' : ''}
                     </li>`).join('');
                 const wooNote = (this.caps && this.caps.woocommerce && this.flow !== 'export')
                     ? '<li class="ys-cwci-guidance__warn"><strong>WooCommerce 仍啟用：</strong>驗證資料無誤後請停用 WooCommerce，再依「搬家指引」調整商品網址前綴。</li>'
                     : '';
+                const retryHtml = this.flow !== 'export' ? `
+                    <fieldset class="ys-cwci-wizard__mode">
+                        <legend>全部重試 — 已匯入過的資料</legend>
+                        <label><input type="radio" name="wz-retry-mode" data-wz-retry-mode value="skip" ${this.retryMode !== 'overwrite' ? 'checked' : ''}> 忽略已匯入</label>
+                        <label><input type="radio" name="wz-retry-mode" data-wz-retry-mode value="overwrite" ${this.retryMode === 'overwrite' ? 'checked' : ''}> 覆蓋已匯入</label>
+                    </fieldset>` : '';
                 p.innerHTML = `
                     <p class="ys-cwci-wizard__desc"><strong>${this.flow === 'export' ? '打包完成！' : '搬家完成！'}</strong></p>
                     <ul class="ys-cwci-guidance">${rows || '<li>本次沒有執行任何項目。</li>'}${wooNote}</ul>
+                    ${retryHtml}
                     <div class="ys-cwci-actions">
+                        ${this.flow !== 'export' ? '<button type="button" class="ys-cwci-btn ys-cwci-btn--primary" data-wz="retry-all">全部重試</button>' : ''}
                         <button type="button" class="ys-cwci-btn ys-cwci-btn--ghost" data-wz="restart">重新開始</button>
-                        <button type="button" class="ys-cwci-btn ys-cwci-btn--primary" data-wz="to-manual">查看工作紀錄（手動模式）</button>
+                        <button type="button" class="ys-cwci-btn ys-cwci-btn--ghost" data-wz="to-manual">查看工作紀錄（手動模式）</button>
                     </div>`;
                 return;
             }
@@ -743,16 +912,114 @@
             throw new Error('執行逾時');
         },
 
+        /* ── v0.7.0 訂單狀態選擇（預設全選 + 未對應詢問） ── */
+        async ordersStatusPrompt(filePath) {
+            if (this.ordersStatus && this.autopilot) {
+                this.log('全部重試：沿用上次的訂單狀態選擇。');
+                return this.ordersStatus;
+            }
+            let data;
+            try {
+                data = await api('/ys-cart-wc-import/v1/packages/order-statuses', { method: 'POST', data: { file_path: filePath } });
+            } catch (error) {
+                this.log(`狀態掃描失敗（${error.message || error}），將匯入全部狀態。`);
+                return { include: [], map: {} };
+            }
+            const statuses = Array.isArray(data.statuses) ? data.statuses : [];
+            if (!statuses.length) {
+                return { include: [], map: {} };
+            }
+            return await new Promise((resolve) => {
+                this._statusResolve = (selection) => { this._statusResolve = null; resolve(selection); };
+                this.renderStatusUI(statuses, Array.isArray(data.ys_statuses) ? data.ys_statuses : []);
+            });
+        },
+
+        renderStatusUI(statuses, ysStatuses) {
+            const wrap = this.panel.querySelector('[data-wz-status-wrap]');
+            if (!wrap) { return; }
+            const options = ysStatuses.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+            const rows = statuses.map((row) => {
+                const status = String(row.status || '');
+                const mapped = row.mapped_to ? String(row.mapped_to) : '';
+                const mapCell = mapped
+                    ? `<span class="ys-cwci-status-pick__map">→ ${escapeHtml(mapped)}</span>`
+                    : `<span class="ys-cwci-status-pick__map is-unmapped">⚠ 未對應，請選擇：</span>
+                       <select data-wz-map="${escapeHtml(status)}">${options}</select>`;
+                return `
+                    <li class="ys-cwci-status-pick__row ${mapped ? '' : 'is-unmapped-row'}">
+                        <label>
+                            <input type="checkbox" data-wz-st value="${escapeHtml(status)}" checked>
+                            <strong>${escapeHtml(status)}</strong>
+                            <span class="ys-cwci-status-pick__count">${Number(row.count || 0)} 筆</span>
+                        </label>
+                        ${mapCell}
+                    </li>`;
+            }).join('');
+            wrap.innerHTML = `
+                <div class="ys-cwci-status-pick">
+                    <strong>選擇要匯入的訂單狀態（預設全選）</strong>
+                    <ul>${rows}</ul>
+                    <button type="button" class="ys-cwci-btn ys-cwci-btn--primary" data-wz="confirm-status">確認並開始匯入</button>
+                </div>`;
+            this.progress(0, '等待確認訂單狀態選擇…');
+        },
+
+        collectStatusUI() {
+            const boxes = Array.from(this.panel.querySelectorAll('[data-wz-st]'));
+            const checked = boxes.filter((box) => box.checked).map((box) => String(box.value));
+            const include = (checked.length === boxes.length) ? [] : checked; // 全選＝不過濾
+            const map = {};
+            this.panel.querySelectorAll('[data-wz-map]').forEach((select) => {
+                map[String(select.getAttribute('data-wz-map'))] = String(select.value);
+            });
+            const wrap = this.panel.querySelector('[data-wz-status-wrap]');
+            if (wrap) { wrap.innerHTML = ''; }
+            return { include, map };
+        },
+
+        /* ── v0.7.0 匯入工作（direct 的 import 階段 / import 流程共用） ── */
+        async createAndRunImport(entity, filePath, fingerprint, mode, statusSel) {
+            const options = { file_path: filePath, source_fingerprint: fingerprint, wizard: this.flow, mode };
+            if (entity === 'orders' && statusSel) {
+                if (Array.isArray(statusSel.include) && statusSel.include.length) { options.status_include = statusSel.include; }
+                if (statusSel.map && Object.keys(statusSel.map).length) { options.status_map = statusSel.map; }
+            }
+            const importJob = await api('/ys-cart-wc-import/v1/import-jobs', { method: 'POST', data: { entity, options } });
+            const done = await this.runJobToEnd(Number(importJob.id), `匯入${entityLabels[entity]}`);
+            if (String(done.status) !== 'completed') {
+                throw new Error(`匯入未完成（${statusLabels[done.status] || done.status}）`);
+            }
+            const cursor = safeParse(done.cursor_json) || {};
+            this.results[entity] = {
+                success: Number(done.success_count || 0),
+                errors: Number(done.error_count || 0),
+                skippedCount: Number(cursor.skipped || 0)
+            };
+            this.log(`匯入完成：成功 ${Number(done.success_count || 0)} 筆、錯誤 ${Number(done.error_count || 0)} 筆${Number(cursor.skipped || 0) > 0 ? `、狀態略過 ${Number(cursor.skipped)} 筆` : ''}`);
+        },
+
+        async directImportPhase(step, filePath, mode) {
+            let statusSel = null;
+            if (step.entity === 'orders') {
+                statusSel = await this.ordersStatusPrompt(filePath);
+                this.ordersStatus = statusSel;
+            }
+            this.progress(0, '建立匯入工作…');
+            await this.createAndRunImport(step.entity, filePath, String(window.ysCwciAdmin.siteFingerprint || ''), mode, statusSel);
+        },
+
         async runEntityStep(step, button) {
             if (this.running) { return; }
             this.running = true;
             setBusy(button, true);
             this.renderActions(step);
             const entity = step.entity;
+            const mode = this.panelMode();
             try {
                 if (step.kind === 'export' || step.kind === 'direct') {
                     this.progress(0, '建立匯出工作…');
-                    const exportJob = await api('/ys-cart-wc-import/v1/export-jobs', { method: 'POST', data: { entity, options: {} } });
+                    const exportJob = await api('/ys-cart-wc-import/v1/export-jobs', { method: 'POST', data: { entity, options: { wizard: this.flow } } });
                     const doneExport = await this.runJobToEnd(Number(exportJob.id), `匯出${entityLabels[entity]}`);
                     if (String(doneExport.status) !== 'completed') {
                         throw new Error(`匯出未完成（${statusLabels[doneExport.status] || doneExport.status}）`);
@@ -763,17 +1030,7 @@
                         this.results[entity] = { success: Number(doneExport.success_count || 0), errors: Number(doneExport.error_count || 0), downloadUrl };
                         this.log('套件已就緒，可於完成頁下載。');
                     } else {
-                        this.progress(0, '建立匯入工作…');
-                        const importJob = await api('/ys-cart-wc-import/v1/import-jobs', {
-                            method: 'POST',
-                            data: { entity, options: { file_path: String(doneExport.file_path || ''), source_fingerprint: String(window.ysCwciAdmin.siteFingerprint || '') } }
-                        });
-                        const doneImport = await this.runJobToEnd(Number(importJob.id), `匯入${entityLabels[entity]}`);
-                        if (String(doneImport.status) !== 'completed') {
-                            throw new Error(`匯入未完成（${statusLabels[doneImport.status] || doneImport.status}）`);
-                        }
-                        this.results[entity] = { success: Number(doneImport.success_count || 0), errors: Number(doneImport.error_count || 0) };
-                        this.log(`匯入完成：成功 ${Number(doneImport.success_count || 0)} 筆、錯誤 ${Number(doneImport.error_count || 0)} 筆`);
+                        await this.directImportPhase(step, String(doneExport.file_path || ''), mode);
                     }
                 } else if (step.kind === 'import') {
                     const fileInput = this.panel.querySelector('[data-wz-file]');
@@ -791,18 +1048,15 @@
                     const packageInfo = await uploadResponse.json();
                     if (packageInfo.code) { throw new Error(packageInfo.message || '上傳失敗。'); }
                     this.log(`套件已上傳（來源：${packageInfo.manifest?.source?.site_url || '來源站'}）`);
-                    const importJob = await api('/ys-cart-wc-import/v1/import-jobs', {
-                        method: 'POST',
-                        data: { entity, options: { file_path: packageInfo.file_path, source_fingerprint: packageInfo.manifest.source.site_url_hash } }
-                    });
-                    const doneImport = await this.runJobToEnd(Number(importJob.id), `匯入${entityLabels[entity]}`);
-                    if (String(doneImport.status) !== 'completed') {
-                        throw new Error(`匯入未完成（${statusLabels[doneImport.status] || doneImport.status}）`);
+                    let statusSel = null;
+                    if (entity === 'orders') {
+                        statusSel = await this.ordersStatusPrompt(packageInfo.file_path);
+                        this.ordersStatus = statusSel;
                     }
-                    this.results[entity] = { success: Number(doneImport.success_count || 0), errors: Number(doneImport.error_count || 0) };
-                    this.log(`匯入完成：成功 ${Number(doneImport.success_count || 0)} 筆、錯誤 ${Number(doneImport.error_count || 0)} 筆`);
+                    await this.createAndRunImport(entity, packageInfo.file_path, packageInfo.manifest.source.site_url_hash, mode, statusSel);
                 }
                 this.running = false;
+                this.saveState();
                 await loadJobs();
                 this.next();
             } catch (error) {
@@ -814,7 +1068,110 @@
             }
         },
 
-        next() { if (this.index < this.steps.length - 1) { this.index++; this.render(); } },
+        /* ── v0.7.0 中斷繼續 ── */
+        async resume() {
+            const pending = this.pendingResume || {};
+            const saved = pending.saved;
+            const unfinished = Array.isArray(pending.unfinished) ? pending.unfinished : [];
+            this.pendingResume = null;
+            if (saved) {
+                this.results = saved.results || {};
+                this.retryMode = saved.retryMode === 'overwrite' ? 'overwrite' : 'skip';
+                this.ordersStatus = saved.ordersStatus || null;
+                this.index = Math.min(Number(saved.index || 0), this.steps.length - 1);
+            }
+            this.render();
+            for (const job of unfinished) {
+                const entity = String(job.entity || '');
+                const stepIdx = this.steps.findIndex((s) => s.entity === entity);
+                if (stepIdx >= 0) { this.index = stepIdx; this.render(); }
+                const step = this.steps[this.index];
+                this.running = true;
+                this.renderActions(step);
+                try {
+                    const done = await this.runJobToEnd(Number(job.id), `繼續${typeLabels[job.type] || ''}${entityLabels[entity] || entity}`);
+                    if (String(done.status) !== 'completed') {
+                        throw new Error(`#${Number(job.id)} ${statusLabels[done.status] || done.status}`);
+                    }
+                    if (job.type === 'export' && this.flow === 'direct') {
+                        this.log(`匯出已接續完成：成功 ${Number(done.success_count || 0)} 筆，接著匯入…`);
+                        this.running = false; // 狀態選擇需要互動
+                        const mode = (job.opts && job.opts.mode === 'overwrite') ? 'overwrite' : this.retryMode;
+                        await this.directImportPhase(step, String(done.file_path || ''), mode);
+                    } else if (job.type === 'export') {
+                        const downloadUrl = `${window.ysCwciAdmin.restUrl}/jobs/${Number(done.id)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}`;
+                        this.results[entity] = { success: Number(done.success_count || 0), errors: Number(done.error_count || 0), downloadUrl };
+                    } else {
+                        const cursor = safeParse(done.cursor_json) || {};
+                        this.results[entity] = { success: Number(done.success_count || 0), errors: Number(done.error_count || 0), skippedCount: Number(cursor.skipped || 0) };
+                    }
+                    this.running = false;
+                    this.saveState();
+                    this.next();
+                } catch (error) {
+                    this.running = false;
+                    this.log(`繼續失敗：${error.message || error}`);
+                    this.renderActions(step);
+                    break;
+                }
+            }
+            await loadJobs();
+        },
+
+        async discard() {
+            const pending = this.pendingResume || {};
+            const unfinished = Array.isArray(pending.unfinished) ? pending.unfinished : [];
+            for (const job of unfinished) {
+                try { await api(`/ys-cart-wc-import/v1/jobs/${Number(job.id)}/cancel`, { method: 'POST' }); } catch (e) { /* 不阻擋 */ }
+            }
+            this.pendingResume = null;
+            this.clearState();
+            this.results = {};
+            this.ordersStatus = null;
+            this.index = 0;
+            this.render();
+            await loadJobs();
+        },
+
+        /* ── v0.7.0 全部重試（autopilot 逐步自動執行） ── */
+        retryAll() {
+            const checked = this.panel.querySelector('[data-wz-retry-mode]:checked');
+            this.retryMode = checked && checked.value === 'overwrite' ? 'overwrite' : 'skip';
+            this.results = {};
+            this.autopilot = true;
+            const firstEntity = this.steps.findIndex((s) => !!s.entity);
+            this.index = firstEntity >= 0 ? firstEntity : 0;
+            this.render();
+            this.maybeAutopilot();
+        },
+
+        maybeAutopilot() {
+            if (!this.autopilot || this.running) { return; }
+            const step = this.steps[this.index];
+            if (!step || !step.entity) {
+                if (step && step.kind === 'done') { this.autopilot = false; }
+                return;
+            }
+            if (step.kind === 'import') { this.autopilot = false; return; } // 上傳需人工選檔
+            const btn = this.panel.querySelector('[data-wz="run-entity"]');
+            if (btn) {
+                window.setTimeout(() => { this.runEntityStep(step, btn); }, 250);
+            }
+        },
+
+        next() {
+            if (this.index < this.steps.length - 1) {
+                this.index++;
+                this.render();
+                if (this.steps[this.index].kind === 'done') {
+                    this.autopilot = false;
+                    this.clearState(); // 完成＝進度清除（重新整理回到乾淨精靈）
+                } else {
+                    this.saveState();
+                }
+                this.maybeAutopilot();
+            }
+        },
         prev() { if (this.index > 0 && !this.running) { this.index--; this.render(); } },
         skip() {
             const step = this.steps[this.index];
@@ -832,8 +1189,17 @@
             if (action === 'next') { wizard.next(); }
             if (action === 'prev') { wizard.prev(); }
             if (action === 'skip') { wizard.skip(); }
-            if (action === 'restart') { wizard.results = {}; wizard.index = 0; wizard.render(); }
+            if (action === 'restart') { wizard.clearState(); wizard.results = {}; wizard.ordersStatus = null; wizard.autopilot = false; wizard.index = 0; wizard.render(); }
             if (action === 'to-manual') { applyMode('manual'); }
+            if (action === 'resume') { wizard.resume(); }
+            if (action === 'discard') { wizard.discard(); }
+            if (action === 'retry-all') { wizard.retryAll(); }
+            if (action === 'confirm-status') {
+                const selection = wizard.collectStatusUI();
+                wizard.ordersStatus = selection;
+                wizard.saveState();
+                if (wizard._statusResolve) { wizard._statusResolve(selection); }
+            }
             if (action === 'backup') {
                 setBusy(btn, true);
                 try {
@@ -861,7 +1227,8 @@
         // 精靈需要 capabilities 決定流程 — 再抓一次（renderCapabilities 沒回傳資料）
         return api('/ys-cart-wc-import/v1/capabilities');
     }).then((caps) => {
-        if (wizard) { wizard.boot(caps); }
+        if (wizard) { return wizard.bootWithResume(caps); }
+        return undefined;
     }).catch(() => {
         if (wizard && wizard.panel) {
             wizard.panel.innerHTML = '<div class="ys-cwci-alert is-error">無法讀取環境狀態，請改用手動模式。</div>';

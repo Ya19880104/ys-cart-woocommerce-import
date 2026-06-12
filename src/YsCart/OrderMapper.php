@@ -7,7 +7,22 @@ defined('ABSPATH') || exit;
 
 final class OrderMapper
 {
-    public static function mapStatus(string $wooStatus): string
+    /**
+     * YS CART 訂單狀態白名單（鏡射核心 Enums\YSOrderStatus；匯入端驗證 status_map 用）。
+     * v0.7.0
+     */
+    public const YS_STATUSES = [
+        'pending', 'paid', 'processing', 'awaiting_ship', 'shipping', 'shipped',
+        'completed', 'cancelled', 'refunded', 'offline_payment', 'failed',
+        'timeout', 'abnormal', 'trash',
+    ];
+
+    /**
+     * Woo → YS 的預設狀態對應（v0.7.0 抽成可查詢的表，狀態端點計算 mapped_to 用）。
+     *
+     * @return array<string,string>
+     */
+    public static function statusMap(): array
     {
         return [
             'pending' => 'pending',
@@ -18,7 +33,19 @@ final class OrderMapper
             'refunded' => 'refunded',
             'failed' => 'failed',
             'trash' => 'trash',
-        ][$wooStatus] ?? 'pending';
+        ];
+    }
+
+    /**
+     * @param array<string,string> $overrides 使用者自訂對應（woo status → ys status），優先於預設表。
+     */
+    public static function mapStatus(string $wooStatus, array $overrides = []): string
+    {
+        if (isset($overrides[$wooStatus]) && in_array($overrides[$wooStatus], self::YS_STATUSES, true)) {
+            return $overrides[$wooStatus];
+        }
+
+        return self::statusMap()[$wooStatus] ?? 'pending';
     }
 
     public static function mapAddress(array $address): array
@@ -39,7 +66,10 @@ final class OrderMapper
         ];
     }
 
-    public static function mapOrder(array $record, int $customerId, int $userId): array
+    /**
+     * @param array<string,string> $statusOverrides v0.7.0 使用者自訂狀態對應。
+     */
+    public static function mapOrder(array $record, int $customerId, int $userId, array $statusOverrides = []): array
     {
         $prices = is_array($record['prices'] ?? null) ? $record['prices'] : [];
         $payment = is_array($record['payment'] ?? null) ? $record['payment'] : [];
@@ -59,7 +89,7 @@ final class OrderMapper
             'order_number' => 'WC-' . (string)($record['number'] ?? $record['source_id'] ?? ''),
             'customer_id' => $customerId,
             'user_id' => $userId,
-            'status' => self::mapStatus((string)($record['status'] ?? 'pending')),
+            'status' => self::mapStatus((string)($record['status'] ?? 'pending'), $statusOverrides),
             'subtotal' => (float)($prices['subtotal'] ?? 0),
             'shipping_total' => (float)($prices['shipping_total'] ?? 0),
             'discount_total' => (float)($prices['discount_total'] ?? 0),

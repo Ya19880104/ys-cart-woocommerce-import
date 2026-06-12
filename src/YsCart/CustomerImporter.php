@@ -31,6 +31,7 @@ final class CustomerImporter
         $success = 0;
         $fingerprint = (string)($options['source_fingerprint'] ?? '');
         $limit = max(1, (int)($limits['max_rows'] ?? 50));
+        $mode = (string)($options['mode'] ?? 'update'); // v0.7.0
 
         // v0.5.0 M1：首批時用 manifest 計數設定進度條分母。
         if ($offset === 0) {
@@ -56,7 +57,7 @@ final class CustomerImporter
 
             $processed++;
             try {
-                $customerId = $this->importCustomerRecord($jobId, $fingerprint, $record);
+                $customerId = $this->importCustomerRecord($jobId, $fingerprint, $record, $mode);
                 if ($customerId > 0) {
                     $success++;
                 }
@@ -82,12 +83,18 @@ final class CustomerImporter
         return ['done' => $done, 'processed' => $processed, 'success' => $success];
     }
 
-    public function importCustomerRecord(int $jobId, string $fingerprint, array $record): int
+    /**
+     * @param string $mode v0.7.0：'skip'＝既有客戶（email 已存在）不更新欄位；預設 'update' 照舊。
+     */
+    public function importCustomerRecord(int $jobId, string $fingerprint, array $record, string $mode = 'update'): int
     {
         $email = strtolower(trim((string)($record['email'] ?? '')));
         if ($email === '' || !is_email($email)) {
             throw new \RuntimeException('Customer email is missing or invalid.');
         }
+
+        // v0.7.0 mode=skip 判定「既有」：email 已對應 WP user（匯入前就存在或先前匯過）。
+        $existedBefore = (bool) email_exists($email);
 
         $userId = $this->ensureUser($email, (string)($record['display_name'] ?? ''), (string)($record['login'] ?? ''));
         $class = self::YS_CUSTOMER;
@@ -97,7 +104,7 @@ final class CustomerImporter
             throw new \RuntimeException('Unable to create YS CART customer.');
         }
 
-        if (method_exists($class, 'update')) {
+        if (method_exists($class, 'update') && !('skip' === $mode && $existedBefore)) {
             $class::update((int)$customerId, CustomerMapper::mapCustomer($record, $userId));
         }
 

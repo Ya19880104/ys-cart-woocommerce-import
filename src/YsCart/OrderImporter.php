@@ -31,8 +31,17 @@ final class OrderImporter
         $offset = (int)($cursor['offset'] ?? 0);
         $processed = 0;
         $success = 0;
+        $skipped = 0;
         $fingerprint = (string)($options['source_fingerprint'] ?? '');
         $limit = max(1, (int)($limits['max_rows'] ?? 50));
+
+        // v0.7.0：匯入模式與訂單狀態控制。
+        // mode: skip（預設＝既有訂單只回填不覆蓋）| overwrite（覆蓋＝更新欄位並重建品項）。
+        // status_include: 勾選要匯入的 Woo 狀態（空＝全部）。
+        // status_map: 使用者自訂 Woo→YS 狀態對應（值已在 JobController 驗證過白名單）。
+        $mode = (string)($options['mode'] ?? 'skip');
+        $statusInclude = array_values(array_filter(array_map('strval', (array)($options['status_include'] ?? []))));
+        $statusMap = is_array($options['status_map'] ?? null) ? $options['status_map'] : [];
 
         // v0.5.0 M1：首批時用 manifest 的 entity 計數設定進度條分母（單階段、可精準顯示 %）。
         if ($offset === 0) {
@@ -48,8 +57,15 @@ final class OrderImporter
             }
 
             $processed++;
+
+            // 狀態過濾：不在勾選清單的訂單跳過（不算錯誤，offset 仍前進避免重讀）。
+            if ($statusInclude !== [] && !in_array((string)($record['status'] ?? ''), $statusInclude, true)) {
+                $skipped++;
+                continue;
+            }
+
             try {
-                $orderId = $this->importOrder($jobId, $fingerprint, $record);
+                $orderId = $this->importOrder($jobId, $fingerprint, $record, $mode, $statusMap);
                 if ($orderId > 0) {
                     $success++;
                 }
@@ -60,19 +76,21 @@ final class OrderImporter
 
         $newOffset = $offset + $processed;
         $done = $processed < $limit;
+        $totalSkipped = ((int)($cursor['skipped'] ?? 0)) + $skipped;
         $repo = new JobRepository();
         $repo->updateProgress($jobId, [
             'processed_count' => $newOffset,
             'success_count' => ((int)($cursor['success'] ?? 0)) + $success,
-            'error_count' => ((int)($cursor['errors'] ?? 0)) + ($processed - $success),
+            'error_count' => ((int)($cursor['errors'] ?? 0)) + ($processed - $success - $skipped),
         ]);
         $repo->updateCursor($jobId, [
             'offset' => $newOffset,
             'success' => ((int)($cursor['success'] ?? 0)) + $success,
-            'errors' => ((int)($cursor['errors'] ?? 0)) + ($processed - $success),
+            'errors' => ((int)($cursor['errors'] ?? 0)) + ($processed - $success - $skipped),
+            'skipped' => $totalSkipped,
         ]);
 
-        return ['done' => $done, 'processed' => $processed, 'success' => $success];
+        return ['done' => $done, 'processed' => $processed, 'success' => $success, 'skipped' => $skipped];
     }
 
     /**
@@ -91,14 +109,23 @@ final class OrderImporter
         }
     }
 
-    private function importOrder(int $jobId, string $fingerprint, array $record): int
+    /**
+     * @param string               $mode      'skip'（預設）或 'overwrite'。
+     * @param array<string,string> $statusMap 使用者自訂狀態對應。
+     */
+    private function importOrder(int $jobId, string $fingerprint, array $record, string $mode = 'skip', array $statusMap = []): int
     {
         $mapRepo = new MapRepository();
         $sourceId = (string)($record['source_id'] ?? '');
         $orderSources = new OrderSourceRepository();
         $existingSourceOrderId = $orderSources->findOrderId($fingerprint, $sourceId);
         if ($existingSourceOrderId) {
-            $this->backfillExistingOrderShipping($existingSourceOrderId, $record);
+            if ('overwrite' === $mode) {
+                // v0.7.0 覆蓋模式：以套件資料更新既有訂單欄位並重建品項。
+                $this->overwriteOrder($jobId, $fingerprint, $existingSourceOrderId, $record, $statusMap);
+            } else {
+                $this->backfillExistingOrderShipping($existingSourceOrderId, $record);
+            }
             $mapRepo->upsert($jobId, $fingerprint, 'order', $sourceId, $existingSourceOrderId, 'ys_order', [
                 'source_order_number' => (string)($record['number'] ?? ''),
                 'source_table' => 'ys_ec_order_sources',
@@ -108,7 +135,11 @@ final class OrderImporter
 
         $existingMap = $mapRepo->find($fingerprint, 'order', $sourceId);
         if ($existingMap) {
-            $this->backfillExistingOrderShipping((int)$existingMap->target_id, $record);
+            if ('overwrite' === $mode) {
+                $this->overwriteOrder($jobId, $fingerprint, (int)$existingMap->target_id, $record, $statusMap);
+            } else {
+                $this->backfillExistingOrderShipping((int)$existingMap->target_id, $record);
+            }
             // v0.2.1 nit B1：legacy map backfill 不驗證 target_id 仍對應有效 YS order。
             // 若該 YS order 已被人工刪除 / 屬於不同 fingerprint，upsertWooOrder 會碰到
             // uk_order_platform unique constraint、$wpdb->query 回 false → silent ignore、
@@ -125,8 +156,12 @@ final class OrderImporter
 
         // v0.5.0 C1：訂單 + 品項 + map + source 原子化。任一步失敗即 ROLLBACK、整筆不落地，
         // 下次重跑由 dedup 乾淨地只建立一次（修「中途失敗 → 重複訂單」）。
-        return Transaction::run(function () use ($jobId, $fingerprint, $record, $sourceId, $customer, $placeholderProductId, $orderClass, $mapRepo, $orderSources): int {
-            $orderData = OrderMapper::mapOrder($record, $customer['customer_id'], $customer['user_id']);
+        return Transaction::run(function () use ($jobId, $fingerprint, $record, $sourceId, $customer, $placeholderProductId, $orderClass, $mapRepo, $orderSources, $statusMap): int {
+            $orderData = OrderMapper::mapOrder($record, $customer['customer_id'], $customer['user_id'], $statusMap);
+            // v0.7.0 跨站整合：orders 表 uk_order_number 唯一鍵 — 不同來源站可能有相同
+            // Woo 單號（WC-1001）。撞號時以來源站短指紋後綴（WC-1001-a1b2c3）區隔，
+            // 決定性產生 → 重跑仍冪等（dedup 走 source/map，不經單號）。
+            $orderData['order_number'] = $this->uniqueOrderNumber((string)($orderData['order_number'] ?? ''), $fingerprint);
             $orderId = (int)$orderClass::create($orderData);
 
             if ($orderId <= 0) {
@@ -150,6 +185,88 @@ final class OrderImporter
             $orderSources->upsertWooOrder($orderId, $fingerprint, $record);
 
             return $orderId;
+        });
+    }
+
+    /**
+     * v0.7.0 跨站整合：order_number 撞號時回傳「單號-來源站短指紋」。
+     *
+     * 同站重匯不會走到這裡（dedup 先攔）；不同來源站同單號 → 各自帶不同短指紋、
+     * 同一來源站重試 → 後綴決定性相同。後綴版仍撞（理論邊界）則拋例外記錄為該筆錯誤。
+     */
+    private function uniqueOrderNumber(string $number, string $fingerprint): string
+    {
+        if ($number === '') {
+            return $number;
+        }
+
+        global $wpdb;
+        $class = self::YS_ORDER;
+        $table = $class::table();
+        $exists = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$table} WHERE order_number = %s LIMIT 1", $number));
+        if (empty($exists)) {
+            return $number;
+        }
+
+        $suffixed = $number . '-' . substr($fingerprint, 0, 6);
+        $existsSuffixed = $wpdb->get_var($wpdb->prepare("SELECT id FROM {$table} WHERE order_number = %s LIMIT 1", $suffixed));
+        if (!empty($existsSuffixed)) {
+            throw new \RuntimeException('Order number collision even with source suffix: ' . $suffixed);
+        }
+
+        return $suffixed;
+    }
+
+    /**
+     * v0.7.0 覆蓋模式：以套件資料更新既有訂單。
+     *
+     * 更新 mapOrder 的全部欄位（排除 order_number＝保留 YS 單號、created_at＝保留原建單時間），
+     * 並刪除舊品項後依套件重建。整段包在交易內，任一步失敗整筆回滾。
+     * 客戶關聯沿用既有 resolveCustomer（冪等）。
+     */
+    private function overwriteOrder(int $jobId, string $fingerprint, int $orderId, array $record, array $statusMap): void
+    {
+        if ($orderId <= 0 || !method_exists(self::YS_ORDER, 'table')) {
+            return;
+        }
+
+        $customer = $this->resolveCustomer($jobId, $fingerprint, $record);
+        $placeholderProductId = $this->ensurePlaceholderProduct();
+        $orderClass = self::YS_ORDER;
+
+        Transaction::run(function () use ($orderId, $record, $customer, $placeholderProductId, $orderClass, $statusMap, $fingerprint): void {
+            global $wpdb;
+
+            $data = OrderMapper::mapOrder($record, $customer['customer_id'], $customer['user_id'], $statusMap);
+            unset($data['order_number'], $data['created_at']); // 保留 YS 單號與原建單時間
+
+            // 鏡射核心 YSOrder::create 的 JSON 欄位序列化（直接 $wpdb->update 不會自動編碼）。
+            foreach (['payment_detail', 'discount_ids'] as $jsonField) {
+                if (isset($data[$jsonField]) && is_array($data[$jsonField])) {
+                    $data[$jsonField] = wp_json_encode($data[$jsonField]);
+                }
+            }
+            $data['updated_at'] = current_time('mysql');
+
+            $table = $orderClass::table();
+            $updated = $wpdb->update($table, $data, ['id' => $orderId]);
+            if (false === $updated) {
+                throw new \RuntimeException('Unable to overwrite YS CART order #' . $orderId . '.');
+            }
+
+            // 重建品項：刪舊（同核心 delete 的品項清理 pattern）→ 依套件重加。
+            $itemsTable = method_exists($orderClass, 'items_table')
+                ? $orderClass::items_table()
+                : $wpdb->prefix . YS_ECOMMERCE_TABLE_PREFIX . 'order_items';
+            $wpdb->delete($itemsTable, ['order_id' => $orderId]);
+
+            foreach ((array)($record['items'] ?? []) as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $target = $this->resolveItemTarget($fingerprint, $item, $placeholderProductId);
+                $orderClass::add_item($orderId, OrderMapper::mapItem($item, $target['product_id'], $target['variant_id']));
+            }
         });
     }
 

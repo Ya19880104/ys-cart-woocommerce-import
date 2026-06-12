@@ -37,6 +37,9 @@ final class ProductImporter
         $fingerprint = (string)($options['source_fingerprint'] ?? '');
         // v0.5.0 H1：圖片落地預設開啟；純匯出站或刻意保留外連時可帶 sideload_images=false 關閉。
         $sideloadImages = (bool)($options['sideload_images'] ?? true);
+        // v0.7.0：mode=skip 時既有商品（SKU/slug 命中）完全不更新（僅補 map）；
+        // 預設 update＝沿用既有「找到就更新」行為（商品的覆蓋語意本來就是更新）。
+        $mode = (string)($options['mode'] ?? 'update');
 
         try {
             $records = (new PackageReader())->streamJsonLines($filePath, $entry);
@@ -52,7 +55,7 @@ final class ProductImporter
                 try {
                     $id = $stage === 'variants'
                         ? $this->importVariant($jobId, $fingerprint, $record, $sideloadImages)
-                        : $this->importProduct($jobId, $fingerprint, $record, $sideloadImages);
+                        : $this->importProduct($jobId, $fingerprint, $record, $sideloadImages, $mode);
                     if ($id > 0) {
                         $success++;
                     }
@@ -79,7 +82,7 @@ final class ProductImporter
         return ['done' => $doneWithStage, 'processed' => $processed, 'success' => $success, 'stage' => $stage];
     }
 
-    private function importProduct(int $jobId, string $fingerprint, array $record, bool $sideloadImages = true): int
+    private function importProduct(int $jobId, string $fingerprint, array $record, bool $sideloadImages = true, string $mode = 'update'): int
     {
         $class = self::YS_PRODUCT;
         $data = ProductMapper::mapProduct($record);
@@ -96,7 +99,7 @@ final class ProductImporter
         }
 
         // v0.5.0 C1：商品 + 屬性 + map 原子化（任一步失敗 ROLLBACK、整筆不落地）。
-        return Transaction::run(function () use ($jobId, $fingerprint, $record, $class, $data): int {
+        return Transaction::run(function () use ($jobId, $fingerprint, $record, $class, $data, $mode): int {
             $existing = null;
 
             if ($data['sku'] !== '' && method_exists($class, 'find_by_sku')) {
@@ -108,6 +111,11 @@ final class ProductImporter
             }
 
             if ($existing) {
+                // v0.7.0 mode=skip：既有商品完全不動（僅補 map）；其餘模式照舊更新。
+                if ('skip' === $mode) {
+                    (new MapRepository())->upsert($jobId, $fingerprint, 'product', (string)$record['source_id'], (int)$existing->id, 'ys_product');
+                    return (int)$existing->id;
+                }
                 $class::update((int)$existing->id, $data);
                 $productId = (int)$existing->id;
             } else {

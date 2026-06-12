@@ -34,6 +34,7 @@ $tests = [
     'static/stability-hardening-v050.php',
     'static/migration-guidance-v051.php',
     'static/wizard-mode-v060.php',
+    'static/resume-retry-status-v070.php',
     'static/security-hardening-v024.php',
 ];
 
