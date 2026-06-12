@@ -32,6 +32,19 @@ final class CustomerImporter
         $fingerprint = (string)($options['source_fingerprint'] ?? '');
         $limit = max(1, (int)($limits['max_rows'] ?? 50));
 
+        // v0.5.0 M1：首批時用 manifest 計數設定進度條分母。
+        if ($offset === 0) {
+            try {
+                $manifest = (new PackageReader())->readManifest($filePath);
+                $total = (int)($manifest['entities']['customers'] ?? 0);
+                if ($total > 0) {
+                    (new JobRepository())->updateProgress($jobId, ['total_count' => $total]);
+                }
+            } catch (Throwable $e) {
+                // manifest 缺失不阻擋匯入。
+            }
+        }
+
         foreach ((new PackageReader())->streamJsonLines($filePath, 'customers.jsonl') as $index => $record) {
             if ($index < $offset) {
                 continue;

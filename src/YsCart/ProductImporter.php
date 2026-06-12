@@ -9,7 +9,9 @@ use Throwable;
 use YangSheep\YsCartWooImport\Database\ErrorRepository;
 use YangSheep\YsCartWooImport\Database\JobRepository;
 use YangSheep\YsCartWooImport\Database\MapRepository;
+use YangSheep\YsCartWooImport\Database\Transaction;
 use YangSheep\YsCartWooImport\Packages\PackageReader;
+// MediaSideloader 同 namespace（YsCart），無需 use。
 
 final class ProductImporter
 {
@@ -33,6 +35,8 @@ final class ProductImporter
         $success = 0;
         $limit = max(1, (int)($limits['max_rows'] ?? 50));
         $fingerprint = (string)($options['source_fingerprint'] ?? '');
+        // v0.5.0 H1：圖片落地預設開啟；純匯出站或刻意保留外連時可帶 sideload_images=false 關閉。
+        $sideloadImages = (bool)($options['sideload_images'] ?? true);
 
         try {
             $records = (new PackageReader())->streamJsonLines($filePath, $entry);
@@ -47,8 +51,8 @@ final class ProductImporter
 
                 try {
                     $id = $stage === 'variants'
-                        ? $this->importVariant($jobId, $fingerprint, $record)
-                        : $this->importProduct($jobId, $fingerprint, $record);
+                        ? $this->importVariant($jobId, $fingerprint, $record, $sideloadImages)
+                        : $this->importProduct($jobId, $fingerprint, $record, $sideloadImages);
                     if ($id > 0) {
                         $success++;
                     }
@@ -75,38 +79,53 @@ final class ProductImporter
         return ['done' => $doneWithStage, 'processed' => $processed, 'success' => $success, 'stage' => $stage];
     }
 
-    private function importProduct(int $jobId, string $fingerprint, array $record): int
+    private function importProduct(int $jobId, string $fingerprint, array $record, bool $sideloadImages = true): int
     {
         $class = self::YS_PRODUCT;
         $data = ProductMapper::mapProduct($record);
-        $existing = null;
 
-        if ($data['sku'] !== '' && method_exists($class, 'find_by_sku')) {
-            $existing = $class::find_by_sku($data['sku']);
+        // v0.5.0 H1：圖片在交易「之前」落地到本站媒體庫（網路 I/O 不可放進 DB 交易）。
+        if ($sideloadImages) {
+            $sideloader = new MediaSideloader();
+            $data['image_url'] = $sideloader->resolveUrl($jobId, $fingerprint, (string)($data['image_url'] ?? ''));
+            $data['gallery_urls'] = $sideloader->resolveUrls(
+                $jobId,
+                $fingerprint,
+                is_array($data['gallery_urls'] ?? null) ? $data['gallery_urls'] : []
+            );
         }
 
-        if (!$existing && $data['slug'] !== '' && method_exists($class, 'find_by_slug')) {
-            $existing = $class::find_by_slug($data['slug']);
-        }
+        // v0.5.0 C1：商品 + 屬性 + map 原子化（任一步失敗 ROLLBACK、整筆不落地）。
+        return Transaction::run(function () use ($jobId, $fingerprint, $record, $class, $data): int {
+            $existing = null;
 
-        if ($existing) {
-            $class::update((int)$existing->id, $data);
-            $productId = (int)$existing->id;
-        } else {
-            $productId = (int)$class::create($data);
-        }
+            if ($data['sku'] !== '' && method_exists($class, 'find_by_sku')) {
+                $existing = $class::find_by_sku($data['sku']);
+            }
 
-        if ($productId <= 0) {
-            throw new \RuntimeException('Unable to create/update YS CART product.');
-        }
+            if (!$existing && $data['slug'] !== '' && method_exists($class, 'find_by_slug')) {
+                $existing = $class::find_by_slug($data['slug']);
+            }
 
-        $this->replaceAttributes($productId, is_array($record['attributes'] ?? null) ? $record['attributes'] : []);
-        (new MapRepository())->upsert($jobId, $fingerprint, 'product', (string)$record['source_id'], $productId, 'ys_product');
+            if ($existing) {
+                $class::update((int)$existing->id, $data);
+                $productId = (int)$existing->id;
+            } else {
+                $productId = (int)$class::create($data);
+            }
 
-        return $productId;
+            if ($productId <= 0) {
+                throw new \RuntimeException('Unable to create/update YS CART product.');
+            }
+
+            $this->replaceAttributes($productId, is_array($record['attributes'] ?? null) ? $record['attributes'] : []);
+            (new MapRepository())->upsert($jobId, $fingerprint, 'product', (string)$record['source_id'], $productId, 'ys_product');
+
+            return $productId;
+        });
     }
 
-    private function importVariant(int $jobId, string $fingerprint, array $record): int
+    private function importVariant(int $jobId, string $fingerprint, array $record, bool $sideloadImages = true): int
     {
         global $wpdb;
 
@@ -118,26 +137,41 @@ final class ProductImporter
         $variantData = ProductMapper::mapVariant($record);
         $variantData['product_id'] = (int)$map->target_id;
         $variantData['attributes'] = wp_json_encode($variantData['attributes']);
-        $variantData['created_at'] = current_time('mysql');
-        $variantData['updated_at'] = current_time('mysql');
+
+        // v0.5.0 H1：變體圖片同樣在交易前落地。
+        if ($sideloadImages) {
+            $variantData['image_url'] = (new MediaSideloader())->resolveUrl(
+                $jobId,
+                $fingerprint,
+                (string)($variantData['image_url'] ?? '')
+            );
+        }
+
         $table = $wpdb->prefix . YS_ECOMMERCE_TABLE_PREFIX . 'product_variants';
 
-        $existing = (new MapRepository())->find($fingerprint, 'variant', (string)$record['source_id']);
-        if ($existing) {
-            unset($variantData['created_at']);
-            $wpdb->update($table, $variantData, ['id' => (int)$existing->target_id]);
-            $variantId = (int)$existing->target_id;
-        } else {
-            $wpdb->insert($table, $variantData);
-            $variantId = (int)$wpdb->insert_id;
-        }
+        // v0.5.0 C1/H3：變體 insert/update + map 原子化。修「insert 成功但 map upsert 失敗 →
+        // 重跑查無 variant map → 再插入一筆重複變體」的窗口。
+        return Transaction::run(function () use ($jobId, $fingerprint, $record, $variantData, $table, $wpdb): int {
+            $data = $variantData;
+            $data['updated_at'] = current_time('mysql');
 
-        if ($variantId <= 0) {
-            throw new \RuntimeException('Unable to create/update YS CART variant.');
-        }
+            $existing = (new MapRepository())->find($fingerprint, 'variant', (string)$record['source_id']);
+            if ($existing) {
+                $wpdb->update($table, $data, ['id' => (int)$existing->target_id]);
+                $variantId = (int)$existing->target_id;
+            } else {
+                $data['created_at'] = current_time('mysql');
+                $wpdb->insert($table, $data);
+                $variantId = (int)$wpdb->insert_id;
+            }
 
-        (new MapRepository())->upsert($jobId, $fingerprint, 'variant', (string)$record['source_id'], $variantId, 'ys_variant');
-        return $variantId;
+            if ($variantId <= 0) {
+                throw new \RuntimeException('Unable to create/update YS CART variant.');
+            }
+
+            (new MapRepository())->upsert($jobId, $fingerprint, 'variant', (string)$record['source_id'], $variantId, 'ys_variant');
+            return $variantId;
+        });
     }
 
     private function replaceAttributes(int $productId, array $attributes): void

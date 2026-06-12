@@ -12,9 +12,15 @@ use YangSheep\YsCartWooImport\Jobs\Scheduler;
 
 final class JobController
 {
+    /** v0.5.0 H2：export/import 僅支援這三種 entity（對齊 JobRunner::dispatch 的 match 分支）。 */
+    private const SUPPORTED_ENTITIES = ['customers', 'products', 'orders'];
+
     public function createExportJob($request)
     {
         $entity = sanitize_key((string)($request['entity'] ?? 'orders'));
+        if (!in_array($entity, self::SUPPORTED_ENTITIES, true)) {
+            return $this->invalidEntityError($entity);
+        }
         $options = is_array($request['options'] ?? null) ? $request['options'] : [];
         // v0.2.4 sanitize package_id (Reviewer #5 配套): export 也允許 caller 帶 package_id、
         // safePackageId 確保 zip path 不會被 traversal。實際 PackageWriter::zip() 已加 safePackageId、
@@ -35,6 +41,9 @@ final class JobController
     public function createImportJob($request)
     {
         $entity = sanitize_key((string)($request['entity'] ?? 'orders'));
+        if (!in_array($entity, self::SUPPORTED_ENTITIES, true)) {
+            return $this->invalidEntityError($entity);
+        }
         $options = is_array($request['options'] ?? null) ? $request['options'] : [];
 
         // v0.2.4 path canonicalize (Reviewer #1):
@@ -70,6 +79,20 @@ final class JobController
     public function listJobs(): array
     {
         return (new JobRepository())->list();
+    }
+
+    private function invalidEntityError(string $entity): \WP_Error
+    {
+        return new \WP_Error(
+            'ys_cwci_invalid_entity',
+            sprintf(
+                /* translators: %1$s = requested entity, %2$s = comma-separated supported entities */
+                __('Unsupported entity "%1$s". Supported: %2$s.', 'ys-cart-woocommerce-import'),
+                $entity,
+                implode(', ', self::SUPPORTED_ENTITIES)
+            ),
+            ['status' => 400]
+        );
     }
 
     public function createDirectJob($request)

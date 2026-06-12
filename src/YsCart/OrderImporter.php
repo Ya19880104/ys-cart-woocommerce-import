@@ -9,6 +9,7 @@ use Throwable;
 use YangSheep\YsCartWooImport\Database\ErrorRepository;
 use YangSheep\YsCartWooImport\Database\JobRepository;
 use YangSheep\YsCartWooImport\Database\MapRepository;
+use YangSheep\YsCartWooImport\Database\Transaction;
 use YangSheep\YsCartWooImport\Packages\PackageReader;
 
 final class OrderImporter
@@ -32,6 +33,11 @@ final class OrderImporter
         $success = 0;
         $fingerprint = (string)($options['source_fingerprint'] ?? '');
         $limit = max(1, (int)($limits['max_rows'] ?? 50));
+
+        // v0.5.0 M1：首批時用 manifest 的 entity 計數設定進度條分母（單階段、可精準顯示 %）。
+        if ($offset === 0) {
+            $this->primeTotalCount($jobId, $filePath, 'orders');
+        }
 
         foreach ((new PackageReader())->streamJsonLines($filePath, 'orders.jsonl') as $index => $record) {
             if ($index < $offset) {
@@ -69,6 +75,22 @@ final class OrderImporter
         return ['done' => $done, 'processed' => $processed, 'success' => $success];
     }
 
+    /**
+     * 盡力而為地用 manifest 的 entity 計數設定 total_count；拿不到就讓進度條 fallback、不影響匯入。
+     */
+    private function primeTotalCount(int $jobId, string $filePath, string $entity): void
+    {
+        try {
+            $manifest = (new PackageReader())->readManifest($filePath);
+            $total = (int)($manifest['entities'][$entity] ?? 0);
+            if ($total > 0) {
+                (new JobRepository())->updateProgress($jobId, ['total_count' => $total]);
+            }
+        } catch (Throwable $e) {
+            // manifest 缺失/無效不阻擋匯入。
+        }
+    }
+
     private function importOrder(int $jobId, string $fingerprint, array $record): int
     {
         $mapRepo = new MapRepository();
@@ -95,32 +117,40 @@ final class OrderImporter
             return (int)$existingMap->target_id;
         }
 
+        // 客戶與占位商品在交易外解析：兩者皆冪等（依 email / SKU 去重），且 wp_insert_user
+        // 等動作有 DB 以外的副作用，不適合被 ROLLBACK 連帶回滾。
         $customer = $this->resolveCustomer($jobId, $fingerprint, $record);
-        $orderData = OrderMapper::mapOrder($record, $customer['customer_id'], $customer['user_id']);
-        $orderClass = self::YS_ORDER;
-        $orderId = (int)$orderClass::create($orderData);
-
-        if ($orderId <= 0) {
-            throw new \RuntimeException('Unable to create YS CART order.');
-        }
-
-        $this->preserveSourceCreatedAt($orderId, (string)($orderData['created_at'] ?? ''));
-
         $placeholderProductId = $this->ensurePlaceholderProduct();
-        foreach ((array)($record['items'] ?? []) as $item) {
-            if (!is_array($item)) {
-                continue;
+        $orderClass = self::YS_ORDER;
+
+        // v0.5.0 C1：訂單 + 品項 + map + source 原子化。任一步失敗即 ROLLBACK、整筆不落地，
+        // 下次重跑由 dedup 乾淨地只建立一次（修「中途失敗 → 重複訂單」）。
+        return Transaction::run(function () use ($jobId, $fingerprint, $record, $sourceId, $customer, $placeholderProductId, $orderClass, $mapRepo, $orderSources): int {
+            $orderData = OrderMapper::mapOrder($record, $customer['customer_id'], $customer['user_id']);
+            $orderId = (int)$orderClass::create($orderData);
+
+            if ($orderId <= 0) {
+                throw new \RuntimeException('Unable to create YS CART order.');
             }
 
-            $target = $this->resolveItemTarget($fingerprint, $item, $placeholderProductId);
-            $orderClass::add_item($orderId, OrderMapper::mapItem($item, $target['product_id'], $target['variant_id']));
-        }
+            $this->preserveSourceCreatedAt($orderId, (string)($orderData['created_at'] ?? ''));
 
-        $mapRepo->upsert($jobId, $fingerprint, 'order', $sourceId, $orderId, 'ys_order', [
-            'source_order_number' => (string)($record['number'] ?? ''),
-        ]);
-        $orderSources->upsertWooOrder($orderId, $fingerprint, $record);
-        return $orderId;
+            foreach ((array)($record['items'] ?? []) as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $target = $this->resolveItemTarget($fingerprint, $item, $placeholderProductId);
+                $orderClass::add_item($orderId, OrderMapper::mapItem($item, $target['product_id'], $target['variant_id']));
+            }
+
+            $mapRepo->upsert($jobId, $fingerprint, 'order', $sourceId, $orderId, 'ys_order', [
+                'source_order_number' => (string)($record['number'] ?? ''),
+            ]);
+            $orderSources->upsertWooOrder($orderId, $fingerprint, $record);
+
+            return $orderId;
+        });
     }
 
     private function backfillExistingOrderShipping(int $orderId, array $record): void

@@ -493,3 +493,34 @@
         animation: none;
     }
 }
+
+/* v0.5.0 UI：包在 YS CART YSAdminApp takeover shell 內時的視覺調和。
+   只在偵測到 YS CART 時加上 .ys-cwci-admin--ysca（純匯出站不套用、維持獨立外觀）。
+   核心 ysca token 此時已載入，以 var(--ysca-*) 對齊主色／邊框／圓角，bespoke 值作 fallback。 */
+.ys-cwci-admin--ysca {
+    max-width: none;
+    color: var(--ysca-text, #102033);
+}
+
+/* page-head 已顯示頁面標題 → 隱藏 hero 內重複的 eyebrow + 主標題，只留說明與狀態。 */
+.ys-cwci-admin--ysca .ys-cwci-eyebrow,
+.ys-cwci-admin--ysca .ys-cwci-hero h1 {
+    display: none;
+}
+
+.ys-cwci-admin--ysca .ys-cwci-hero,
+.ys-cwci-admin--ysca .ys-cwci-card {
+    border-color: var(--ysca-border, #d7e1ee);
+    border-radius: var(--ysca-radius-card, 8px);
+}
+
+.ys-cwci-admin--ysca .ys-cwci-btn--primary {
+    background: var(--ysca-primary, #2864d8);
+    border-color: var(--ysca-primary, #2864d8);
+}
+
+.ys-cwci-admin--ysca .ys-cwci-btn--primary:hover:not(:disabled),
+.ys-cwci-admin--ysca .ys-cwci-btn--primary:focus:not(:disabled) {
+    background: var(--ysca-primary-strong, #1f56bd);
+    border-color: var(--ysca-primary-strong, #1f56bd);
+}

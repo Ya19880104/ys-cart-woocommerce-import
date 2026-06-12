@@ -1,9 +1,15 @@
 <?php
 defined('ABSPATH') || exit;
 
-echo '<div class="wrap ys-cwci-wrap">';
+// $ys_cwci_chrome 由 AdminPage::render() 設定：true = 已包在 YS CART 的 YSAdminApp
+// takeover shell 內（不需自帶 .wrap，標題改由 page-head 顯示）；false = 獨立站 .wrap。
+$ys_cwci_chrome = !empty($ys_cwci_chrome);
+
+if (!$ys_cwci_chrome) {
+    echo '<div class="wrap ys-cwci-wrap">';
+}
 ?>
-<div class="ys-cwci-admin">
+<div class="ys-cwci-admin<?php echo $ys_cwci_chrome ? ' ys-cwci-admin--ysca' : ''; ?>">
     <div id="ys-cwci-app" class="ys-cwci-shell">
         <header class="ys-cwci-hero">
             <div>
@@ -123,4 +129,8 @@ echo '<div class="wrap ys-cwci-wrap">';
         </section>
     </div>
 </div>
-<?php echo '</div>'; ?>
+<?php
+if (!$ys_cwci_chrome) {
+    echo '</div>';
+}
+?>
