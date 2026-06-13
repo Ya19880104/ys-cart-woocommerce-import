@@ -81,7 +81,7 @@ v070_check('R6 OrderImporter mode/status filter/skipped + overwriteOrder',
     && str_contains($oi, 'private function overwriteOrder(')
     && (bool) preg_match('/overwriteOrder\([\s\S]{0,900}Transaction::run/s', $oi)
     && str_contains($oi, "unset(\$data['order_number'], \$data['created_at'])")
-    // 跨站整合：不同來源站同單號 → 短指紋後綴（uk_order_number 唯一鍵，dev-checkout T4 實測抓出）
+    // 跨站整合：不同來源站同單號 → 短指紋後綴（uk_order_number 唯一鍵，跨站往返 T4 實測抓出）
     && str_contains($oi, 'private function uniqueOrderNumber('));
 
 v070_check('R7 OrderMapper YS_STATUSES + statusMap() + overrides',

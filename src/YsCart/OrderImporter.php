@@ -255,6 +255,13 @@ final class OrderImporter
             }
 
             // 重建品項：刪舊（同核心 delete 的品項清理 pattern）→ 依套件重加。
+            //
+            // 金額權威性（與建立路徑一致、刻意不重算）：表頭金額（subtotal / total /
+            // shipping_fee / discount …）一律採上面 mapOrder 寫入的套件值 —— 那是來源站
+            // （Woo）結算後的權威金額，已含運費 / 折扣 / 稅，並非品項單純加總。核心
+            // YSOrder::add_item 是純 INSERT、不回算表頭，故下方重建品項不會改動已寫入的金額。
+            // ⚠ 切勿改成「依重建後的品項重算 total」：會丟失運費 / 折扣 / 稅，且與 importOrder
+            //   建立路徑（同樣信任 mapOrder 金額）產生不一致。
             $itemsTable = method_exists($orderClass, 'items_table')
                 ? $orderClass::items_table()
                 : $wpdb->prefix . YS_ECOMMERCE_TABLE_PREFIX . 'order_items';

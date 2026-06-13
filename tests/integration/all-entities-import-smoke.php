@@ -40,7 +40,7 @@ $entities = [
 $results = [];
 
 foreach ($entities as $entity => $maxTotal) {
-    $packageId = 'dev-checkout-' . $entity . '-smoke-' . gmdate('YmdHis');
+    $packageId = 'wci-' . $entity . '-smoke-' . gmdate('YmdHis');
     $exportJobId = $repo->create('export', $entity, [
         'package_id' => $packageId,
         'batch_size' => 5,

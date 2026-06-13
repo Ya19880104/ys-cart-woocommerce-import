@@ -28,7 +28,7 @@ foreach ($required as $name => $ok) {
 
 $repo = new JobRepository();
 $runner = new JobRunner();
-$packageId = 'dev-checkout-import-smoke-' . gmdate('YmdHis');
+$packageId = 'wci-import-smoke-' . gmdate('YmdHis');
 $fingerprint = hash('sha256', home_url());
 
 $exportJobId = $repo->create('export', 'orders', [

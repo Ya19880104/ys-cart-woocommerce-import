@@ -20,7 +20,7 @@ if (!class_exists(JobRepository::class) || !class_exists(JobRunner::class)) {
 }
 
 $repo = new JobRepository();
-$packageId = 'dev-checkout-smoke-' . gmdate('YmdHis');
+$packageId = 'wci-export-smoke-' . gmdate('YmdHis');
 $jobId = $repo->create('export', 'orders', [
     'package_id' => $packageId,
     'batch_size' => 2,

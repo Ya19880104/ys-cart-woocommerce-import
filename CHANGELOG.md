@@ -5,6 +5,24 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.2] - 2026-06-13 — 整備清理（公開 repo 衛生 + 註解鎖定）
+
+無執行期行為變更。本版為售前複查後的整備：
+
+### Changed
+
+- **整合測試移除內部 staging 站名**：`tests/integration/` 4 支煙霧測試的檔名與套件 ID
+  前綴原帶一個內部測試站名。本 repo 為公開下載用，已改為中性命名（檔名去除站名前綴、
+  套件 ID 改 `wci-…`），並更新一處靜態測試註解。純命名調整，測試邏輯與涵蓋範圍不變。
+
+### Notes
+
+- **覆蓋模式金額權威性（以註解鎖定，非行為變更）**：覆蓋既有訂單時，訂單表頭金額
+  （`subtotal` / `total` / `shipping_fee` / `discount` …）一律採套件 `mapOrder` 的值
+  —— 即來源站（Woo）結算後、已含運費／折扣／稅的權威金額，並非品項單純加總。核心
+  `YSOrder::add_item` 為純 INSERT、不回算表頭，故重建品項不會改動已寫入金額；此行為與
+  建立路徑一致，**刻意不依品項重算**（重算會丟失運費／折扣／稅且造成兩路徑不一致）。
+
 ## [0.7.1] - 2026-06-13 — 回歸獨立 UI
 
 ### Changed

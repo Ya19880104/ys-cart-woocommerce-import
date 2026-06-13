@@ -44,7 +44,7 @@ $results = [
 ];
 
 foreach ($entities as $entity) {
-    $packageId = 'dev-checkout-full-' . $entity . '-' . gmdate('YmdHis');
+    $packageId = 'wci-full-' . $entity . '-' . gmdate('YmdHis');
     $exportJobId = $repo->create('export', $entity, [
         'package_id' => $packageId,
         'batch_size' => $batchSize,
