@@ -5,6 +5,20 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.3] - 2026-06-14 — 變體規格軸名 key 還原（修匯入造成的前台亂碼）
+
+### Fixed
+
+- **變體 attributes 的軸名 key 寫入 percent-encoded 亂碼**：WooCommerce 對 custom（非 taxonomy）
+  attribute，`WC_Product_Variation::get_attributes()` 回傳的 key 是 `sanitize_title(規格名)`
+  （中文 → `%e5%95%86...`）。原 `ProductExporter::serializeVariation()` 直接帶過，導致
+  YS CART `product_variants.attributes` 存入編碼 key，前台規格選擇器軸名顯示成亂碼。
+  修法：以 parent 的 `get_attributes()` 建 `sanitize_title(name) => name` 對照表，序列化時
+  把 variation 的編碼 key 還原為原始規格名再輸出。**不用 `rawurldecode`**——sanitize_title
+  對純中文可逆，但對含空格/英數/大寫的名稱不可逆（空格→`-`、轉小寫）會還原錯；taxonomy
+  attribute 的 `pa_xxx` key 經此對照維持原樣。下游 ProductMapper / ProductImporter 自動受惠。
+  （既有已匯入的壞資料由核心 YS CART v2.52.43 migration 一次性還原。）
+
 ## [0.7.2] - 2026-06-13 — 整備清理（公開 repo 衛生 + 註解鎖定）
 
 無執行期行為變更。本版為售前複查後的整備：
