@@ -13,3 +13,5 @@
 # Dev-only docs — keep local, never publish
 /docs/superpowers/
 /docs/mcp-skills/
+/tests
+/tests/
