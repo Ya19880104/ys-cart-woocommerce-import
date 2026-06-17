@@ -5,6 +5,15 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.5] - 2026-06-18
+
+### Fixed
+
+- Normalize imported Woo order country values to two-character ISO-like codes
+  before creating YS CART orders. This prevents historical corrupted values such
+  as full English country names, `TW450`, currency-like `MYR`, blank values, or
+  email strings from failing against YS CART country columns.
+
 ## [0.7.4] - 2026-06-18
 
 ### Added

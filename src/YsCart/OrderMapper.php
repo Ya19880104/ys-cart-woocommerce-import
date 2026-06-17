@@ -56,7 +56,7 @@ final class OrderMapper
             'name' => $name,
             'phone' => (string)($address['phone'] ?? ''),
             'email' => (string)($address['email'] ?? ''),
-            'country' => (string)($address['country'] ?? ''),
+            'country' => self::countryCode((string)($address['country'] ?? '')),
             'postcode' => (string)($address['postcode'] ?? ''),
             'state' => (string)($address['state'] ?? ''),
             'city' => (string)($address['city'] ?? ''),
@@ -167,5 +167,36 @@ final class OrderMapper
 
         $timestamp = strtotime($date);
         return $timestamp ? gmdate('Y-m-d H:i:s', $timestamp) : null;
+    }
+
+    private static function countryCode(string $country): string
+    {
+        $normalized = strtoupper(trim($country));
+
+        if (preg_match('/^[A-Z]{2}$/', $normalized) === 1) {
+            return $normalized;
+        }
+
+        $aliases = [
+            'AUSTRALIA' => 'AU',
+            'MALAYSIA' => 'MY',
+            'MYR' => 'MY',
+            'NEW ZEALAND' => 'NZ',
+            'UK' => 'GB',
+            'UNITED KINGDOM' => 'GB',
+            'UNITED STATES' => 'US',
+            'UNITED STATES OF AMERICA' => 'US',
+            'USA' => 'US',
+        ];
+
+        if (isset($aliases[$normalized])) {
+            return $aliases[$normalized];
+        }
+
+        if (strpos($normalized, 'TW') === 0) {
+            return 'TW';
+        }
+
+        return 'TW';
     }
 }
