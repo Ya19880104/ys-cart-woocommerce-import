@@ -123,6 +123,7 @@ final class OrderExporter
             'created_at' => $this->date($order->get_date_created()),
             'completed_at' => $this->date($order->get_date_completed()),
             'items' => $items,
+            'download_permissions' => (new DownloadPermissionExporter())->forOrder((int)$order->get_id()),
         ];
     }
 

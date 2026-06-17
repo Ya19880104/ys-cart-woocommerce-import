@@ -25,6 +25,10 @@ final class ProductMapper
             'stock_qty' => $ysType === 'variable' ? -1 : (int)($record['stock_quantity'] ?? -1),
             'image_url' => (string)($record['image_url'] ?? ''),
             'gallery_urls' => is_array($record['gallery_urls'] ?? null) ? $record['gallery_urls'] : [],
+            'is_virtual' => self::boolFlag($record['is_virtual'] ?? false) ? 1 : 0,
+            'download_limit' => (int)(($record['download_limit'] ?? '') !== '' ? $record['download_limit'] : -1),
+            'download_expiry_days' => (int)(($record['download_expiry_days'] ?? '') !== '' ? $record['download_expiry_days'] : -1),
+            'access_type' => self::accessType($record),
             'weight' => (float)(($record['weight'] ?? '') !== '' ? $record['weight'] : 0),
             'length' => (float)(($record['length'] ?? '') !== '' ? $record['length'] : 0),
             'width' => (float)(($record['width'] ?? '') !== '' ? $record['width'] : 0),
@@ -35,6 +39,8 @@ final class ProductMapper
     public static function mapVariant(array $record): array
     {
         $attributes = is_array($record['attributes'] ?? null) ? $record['attributes'] : [];
+        $isVirtual = self::boolFlag($record['is_virtual'] ?? false);
+        $isDownloadable = self::boolFlag($record['is_downloadable'] ?? false);
 
         return [
             'attributes' => $attributes,
@@ -48,7 +54,35 @@ final class ProductMapper
             'width' => (float)(($record['width'] ?? '') !== '' ? $record['width'] : 0),
             'height' => (float)(($record['height'] ?? '') !== '' ? $record['height'] : 0),
             'image_url' => (string)($record['image_url'] ?? ''),
+            'requires_shipping_override' => ($isVirtual || $isDownloadable) ? 0 : 1,
+            'has_digital_override' => $isDownloadable ? 1 : 0,
             'is_active' => 1,
         ];
+    }
+
+    private static function boolFlag(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (int)$value === 1;
+        }
+
+        return in_array(strtolower(trim((string)$value)), ['1', 'yes', 'true', 'on'], true);
+    }
+
+    private static function accessType(array $record): ?string
+    {
+        $raw = (string)($record['access_type'] ?? '');
+        $accessType = function_exists('sanitize_key')
+            ? sanitize_key($raw)
+            : strtolower(preg_replace('/[^a-z0-9_-]+/i', '', $raw) ?? '');
+        if (in_array($accessType, ['download', 'stream', 'redirect', 'perpetual', 'timed'], true)) {
+            return $accessType;
+        }
+
+        return self::boolFlag($record['is_downloadable'] ?? false) ? 'download' : null;
     }
 }

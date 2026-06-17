@@ -5,6 +5,17 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.4] - 2026-06-18
+
+### Added
+
+- Export Woo downloadable product metadata into product and variation records.
+- Import mapped Woo downloadable files into YS CART `digital_files`, keyed by
+  Woo source product or variation ID plus `source_download_id`.
+- Backfill historical Woo downloadable order permissions into YS CART
+  `download_permissions` after order import, preserving remaining/downloaded
+  counts and expiry where Woo provided them.
+
 ## [0.7.3] - 2026-06-14 — 變體規格軸名 key 還原（修匯入造成的前台亂碼）
 
 ### Fixed

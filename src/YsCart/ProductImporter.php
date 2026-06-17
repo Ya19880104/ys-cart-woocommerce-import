@@ -128,6 +128,7 @@ final class ProductImporter
 
             $this->replaceAttributes($productId, is_array($record['attributes'] ?? null) ? $record['attributes'] : []);
             (new MapRepository())->upsert($jobId, $fingerprint, 'product', (string)$record['source_id'], $productId, 'ys_product');
+            $this->syncDigitalFiles($jobId, $fingerprint, $productId, null, $record);
 
             return $productId;
         });
@@ -178,8 +179,196 @@ final class ProductImporter
             }
 
             (new MapRepository())->upsert($jobId, $fingerprint, 'variant', (string)$record['source_id'], $variantId, 'ys_variant');
+            $this->syncDigitalFiles($jobId, $fingerprint, (int)$variantData['product_id'], $variantId, $record);
             return $variantId;
         });
+    }
+
+    private function syncDigitalFiles(int $jobId, string $fingerprint, int $productId, ?int $variantId, array $record): void
+    {
+        global $wpdb;
+
+        $downloads = is_array($record['downloads'] ?? null) ? $record['downloads'] : [];
+        if ($downloads === []) {
+            return;
+        }
+
+        $table = $wpdb->prefix . YS_ECOMMERCE_TABLE_PREFIX . 'digital_files';
+        $mapRepo = new MapRepository();
+        $sourceProductId = (string)($record['source_id'] ?? '');
+
+        foreach ($downloads as $download) {
+            if (!is_array($download)) {
+                continue;
+            }
+
+            $sourceDownloadId = (string)($download['source_download_id'] ?? '');
+            if ($sourceDownloadId === '') {
+                $sourceDownloadId = sha1((string)($download['file'] ?? wp_json_encode($download)));
+            }
+
+            $mapSourceId = $sourceProductId . ':' . $sourceDownloadId;
+            $file = $this->resolveDigitalFileReference($download, $sourceProductId, $sourceDownloadId);
+            if ($file === null) {
+                (new ErrorRepository())->record($jobId, 'digital_file', $mapSourceId, 'Woo downloadable file is missing or cannot be resolved.', $download);
+                continue;
+            }
+
+            $now = current_time('mysql');
+            $data = [
+                'product_id' => $productId,
+                'variant_id' => $variantId,
+                'file_name' => $file['file_name'],
+                'file_type' => $file['file_type'],
+                'file_path' => $file['file_path'],
+                'file_url' => $file['file_url'],
+                'file_size' => $file['file_size'],
+                'file_hash' => $file['file_hash'],
+                'mime_type' => $file['mime_type'],
+                'version' => '1.0.0',
+                'is_active' => 1,
+                'updated_at' => $now,
+            ];
+
+            $existing = $mapRepo->find($fingerprint, 'digital_file', $mapSourceId);
+            if ($existing) {
+                $wpdb->update($table, $data, ['id' => (int)$existing->target_id]);
+                $fileId = (int)$existing->target_id;
+            } else {
+                $data['created_at'] = $now;
+                $wpdb->insert($table, $data);
+                $fileId = (int)$wpdb->insert_id;
+            }
+
+            if ($fileId <= 0) {
+                (new ErrorRepository())->record($jobId, 'digital_file', $mapSourceId, 'Unable to create/update YS CART digital file.', $download);
+                continue;
+            }
+
+            $mapRepo->upsert($jobId, $fingerprint, 'digital_file', $mapSourceId, $fileId, 'ys_digital_file', [
+                'source_download_id' => $sourceDownloadId,
+                'source_file' => (string)($download['file'] ?? ''),
+                'source_product_id' => $sourceProductId,
+                'product_id' => $productId,
+                'variant_id' => $variantId,
+            ]);
+        }
+    }
+
+    private function resolveDigitalFileReference(array $download, string $sourceProductId, string $sourceDownloadId): ?array
+    {
+        $source = trim((string)($download['file'] ?? ''));
+        if ($source === '') {
+            return null;
+        }
+
+        $displayName = trim((string)($download['file_name'] ?? $download['name'] ?? ''));
+        $pathName = basename((string)(parse_url($source, PHP_URL_PATH) ?: $source));
+        $fileName = $this->sanitizeFileName($displayName !== '' ? $displayName : $pathName);
+        if ($fileName === '') {
+            $fileName = $this->sanitizeFileName($sourceDownloadId ?: 'download');
+        }
+
+        $localPath = $this->sourceFileToLocalPath($source);
+        if ($localPath !== '' && is_file($localPath) && is_readable($localPath)) {
+            $stored = $this->copyToDigitalStorage($localPath, $sourceProductId, $sourceDownloadId, $fileName);
+            if ($stored === null) {
+                return null;
+            }
+
+            $mime = function_exists('wp_check_filetype') ? wp_check_filetype($stored['path'], null) : ['type' => ''];
+            return [
+                'file_name' => $fileName,
+                'file_type' => 'local',
+                'file_path' => $stored['key'],
+                'file_url' => null,
+                'file_size' => is_file($stored['path']) ? filesize($stored['path']) : null,
+                'file_hash' => is_file($stored['path']) ? hash_file('sha256', $stored['path']) : null,
+                'mime_type' => (string)($mime['type'] ?? ''),
+            ];
+        }
+
+        if (preg_match('#^https?://#i', $source)) {
+            return [
+                'file_name' => $fileName,
+                'file_type' => 'url',
+                'file_path' => null,
+                'file_url' => $source,
+                'file_size' => null,
+                'file_hash' => null,
+                'mime_type' => '',
+            ];
+        }
+
+        return null;
+    }
+
+    private function sourceFileToLocalPath(string $source): string
+    {
+        $path = $source;
+        if (preg_match('#^https?://#i', $source)) {
+            $sourcePath = (string)parse_url($source, PHP_URL_PATH);
+            if ($sourcePath === '') {
+                return '';
+            }
+            $path = ltrim(rawurldecode($sourcePath), '/');
+        }
+
+        $path = str_replace('\\', '/', $path);
+        if (is_file($path)) {
+            return $path;
+        }
+
+        $candidates = [];
+        if (defined('ABSPATH')) {
+            $candidates[] = rtrim((string)ABSPATH, '/\\') . '/' . ltrim($path, '/');
+        }
+        if (defined('WP_CONTENT_DIR')) {
+            $candidates[] = rtrim((string)WP_CONTENT_DIR, '/\\') . '/' . ltrim(preg_replace('#^wp-content/#', '', $path), '/');
+        }
+
+        foreach ($candidates as $candidate) {
+            if (is_file($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @return array{key:string,path:string}|null
+     */
+    private function copyToDigitalStorage(string $localPath, string $sourceProductId, string $sourceDownloadId, string $fileName): ?array
+    {
+        if (!class_exists('\YangSheep\Ecommerce\Storage\YSProtectedStorage')) {
+            return null;
+        }
+
+        $storage = \YangSheep\Ecommerce\Storage\YSProtectedStorage::digital();
+        $dir = $storage->ensure();
+        if ($dir === '') {
+            return null;
+        }
+
+        $prefix = $this->sanitizeFileName($sourceProductId . '-' . $sourceDownloadId);
+        $targetName = function_exists('wp_unique_filename')
+            ? wp_unique_filename($dir, $prefix . '-' . $fileName)
+            : $prefix . '-' . $fileName;
+        $targetPath = rtrim($dir, '/\\') . '/' . $targetName;
+
+        if (!copy($localPath, $targetPath)) {
+            return null;
+        }
+
+        return ['key' => $targetName, 'path' => $targetPath];
+    }
+
+    private function sanitizeFileName(string $name): string
+    {
+        return function_exists('sanitize_file_name')
+            ? sanitize_file_name($name)
+            : preg_replace('/[^A-Za-z0-9._-]+/', '-', $name);
     }
 
     private function replaceAttributes(int $productId, array $attributes): void
@@ -224,4 +413,3 @@ final class ProductImporter
         ]);
     }
 }
-

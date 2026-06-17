@@ -130,6 +130,7 @@ final class OrderImporter
                 'source_order_number' => (string)($record['number'] ?? ''),
                 'source_table' => 'ys_ec_order_sources',
             ]);
+            (new DownloadPermissionBackfiller())->backfillFromOrderRecord($jobId, $fingerprint, $existingSourceOrderId, $record);
             return $existingSourceOrderId;
         }
 
@@ -145,6 +146,7 @@ final class OrderImporter
             // uk_order_platform unique constraint、$wpdb->query 回 false → silent ignore、
             // import flow 不中斷。這是 race / 孤兒 map 的容忍策略、刻意不 throw。
             $orderSources->upsertWooOrder((int)$existingMap->target_id, $fingerprint, $record);
+            (new DownloadPermissionBackfiller())->backfillFromOrderRecord($jobId, $fingerprint, (int)$existingMap->target_id, $record);
             return (int)$existingMap->target_id;
         }
 
@@ -183,6 +185,7 @@ final class OrderImporter
                 'source_order_number' => (string)($record['number'] ?? ''),
             ]);
             $orderSources->upsertWooOrder($orderId, $fingerprint, $record);
+            (new DownloadPermissionBackfiller())->backfillFromOrderRecord($jobId, $fingerprint, $orderId, $record);
 
             return $orderId;
         });

@@ -102,6 +102,12 @@ final class ProductExporter
             'height' => $product->get_height(),
             'image_url' => $this->imageUrl((int)$product->get_image_id()),
             'gallery_urls' => array_values(array_filter(array_map([$this, 'imageUrl'], $product->get_gallery_image_ids()))),
+            'is_virtual' => method_exists($product, 'is_virtual') ? (bool)$product->is_virtual() : false,
+            'is_downloadable' => method_exists($product, 'is_downloadable') ? (bool)$product->is_downloadable() : false,
+            'download_limit' => method_exists($product, 'get_download_limit') ? (int)$product->get_download_limit() : -1,
+            'download_expiry_days' => method_exists($product, 'get_download_expiry') ? (int)$product->get_download_expiry() : -1,
+            'access_type' => method_exists($product, 'is_downloadable') && $product->is_downloadable() ? 'download' : '',
+            'downloads' => $this->serializeDownloads($product),
             'attributes' => $attributes,
             'category_names' => $this->categoryNames($product->get_id()),
         ];
@@ -123,7 +129,44 @@ final class ProductExporter
             'width' => $variation->get_width(),
             'height' => $variation->get_height(),
             'image_url' => $this->imageUrl((int)$variation->get_image_id()),
+            'is_virtual' => method_exists($variation, 'is_virtual') ? (bool)$variation->is_virtual() : false,
+            'is_downloadable' => method_exists($variation, 'is_downloadable') ? (bool)$variation->is_downloadable() : false,
+            'download_limit' => method_exists($variation, 'get_download_limit') ? (int)$variation->get_download_limit() : -1,
+            'download_expiry_days' => method_exists($variation, 'get_download_expiry') ? (int)$variation->get_download_expiry() : -1,
+            'access_type' => method_exists($variation, 'is_downloadable') && $variation->is_downloadable() ? 'download' : '',
+            'downloads' => $this->serializeDownloads($variation),
         ];
+    }
+
+    private function serializeDownloads($product): array
+    {
+        if (!method_exists($product, 'get_downloads')) {
+            return [];
+        }
+
+        $downloads = $product->get_downloads();
+        $records = [];
+        foreach ($downloads as $key => $download) {
+            $downloadId = is_object($download) && method_exists($download, 'get_id')
+                ? (string)$download->get_id()
+                : (string)$key;
+            $file = is_object($download) && method_exists($download, 'get_file')
+                ? (string)$download->get_file()
+                : '';
+            $name = is_object($download) && method_exists($download, 'get_name')
+                ? (string)$download->get_name()
+                : '';
+
+            $path = (string)(parse_url($file, PHP_URL_PATH) ?: $file);
+            $records[] = [
+                'source_download_id' => $downloadId !== '' ? $downloadId : (string)$key,
+                'name' => $name,
+                'file' => $file,
+                'file_name' => $name !== '' ? $name : basename($path),
+            ];
+        }
+
+        return $records;
     }
 
     /**
