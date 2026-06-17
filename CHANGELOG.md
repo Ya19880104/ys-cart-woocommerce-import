@@ -5,6 +5,14 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.6] - 2026-06-18
+
+### Fixed
+
+- Clear imported Woo postcode values longer than the YS CART order postcode
+  column. This handles historical orders where address text was stored in the
+  Woo postcode field.
+
 ## [0.7.5] - 2026-06-18
 
 ### Fixed

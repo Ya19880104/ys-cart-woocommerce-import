@@ -57,7 +57,7 @@ final class OrderMapper
             'phone' => (string)($address['phone'] ?? ''),
             'email' => (string)($address['email'] ?? ''),
             'country' => self::countryCode((string)($address['country'] ?? '')),
-            'postcode' => (string)($address['postcode'] ?? ''),
+            'postcode' => self::postcode((string)($address['postcode'] ?? '')),
             'state' => (string)($address['state'] ?? ''),
             'city' => (string)($address['city'] ?? ''),
             'district' => (string)($address['district'] ?? ''),
@@ -198,5 +198,12 @@ final class OrderMapper
         }
 
         return 'TW';
+    }
+
+    private static function postcode(string $postcode): string
+    {
+        $normalized = trim($postcode);
+
+        return strlen($normalized) <= 10 ? $normalized : '';
     }
 }
