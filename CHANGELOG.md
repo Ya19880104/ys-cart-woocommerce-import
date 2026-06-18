@@ -5,6 +5,14 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.8] - 2026-06-18
+
+### Fixed
+
+- Export Woo orders with `status=any` by default so historical custom statuses
+  stored in HPOS, such as shipped/preparing-shipment states, are included even
+  when their original status-registration plugin is inactive.
+
 ## [0.7.7] - 2026-06-18
 
 ### Fixed

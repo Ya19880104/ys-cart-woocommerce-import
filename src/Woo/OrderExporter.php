@@ -31,7 +31,7 @@ final class OrderExporter
 
         $ids = wc_get_orders([
             'type' => 'shop_order',
-            'status' => $options['statuses'] ?? array_keys(wc_get_order_statuses()),
+            'status' => $options['statuses'] ?? 'any',
             'limit' => $limit,
             'paged' => $page,
             'orderby' => 'ID',
