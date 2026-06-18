@@ -5,6 +5,14 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.9] - 2026-06-18
+
+### Fixed
+
+- Refresh `ys_ec_order_sources.source_created_at` and source metadata when an
+  imported Woo order is found through an existing source row, allowing
+  overwrite re-imports to repair source timestamps as well as the YS order row.
+
 ## [0.7.8] - 2026-06-18
 
 ### Fixed

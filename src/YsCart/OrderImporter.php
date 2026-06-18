@@ -130,6 +130,7 @@ final class OrderImporter
                 'source_order_number' => (string)($record['number'] ?? ''),
                 'source_table' => 'ys_ec_order_sources',
             ]);
+            $orderSources->upsertWooOrder($existingSourceOrderId, $fingerprint, $record);
             (new DownloadPermissionBackfiller())->backfillFromOrderRecord($jobId, $fingerprint, $existingSourceOrderId, $record);
             return $existingSourceOrderId;
         }
