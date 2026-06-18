@@ -165,8 +165,12 @@ final class OrderMapper
             return null;
         }
 
-        $timestamp = strtotime($date);
-        return $timestamp ? gmdate('Y-m-d H:i:s', $timestamp) : null;
+        try {
+            $dt = new \DateTimeImmutable($date, new \DateTimeZone('UTC'));
+            return $dt->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s');
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     private static function countryCode(string $country): string

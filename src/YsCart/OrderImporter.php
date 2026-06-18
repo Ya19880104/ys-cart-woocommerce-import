@@ -241,7 +241,7 @@ final class OrderImporter
             global $wpdb;
 
             $data = OrderMapper::mapOrder($record, $customer['customer_id'], $customer['user_id'], $statusMap);
-            unset($data['order_number'], $data['created_at']); // 保留 YS 單號與原建單時間
+            unset($data['order_number']); // 保留 YS 單號；created_at 以來源 Woo 時間修正。
 
             // 鏡射核心 YSOrder::create 的 JSON 欄位序列化（直接 $wpdb->update 不會自動編碼）。
             foreach (['payment_detail', 'discount_ids'] as $jsonField) {

@@ -5,6 +5,16 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.7] - 2026-06-18
+
+### Fixed
+
+- Export Woo order dates from the UTC timestamp instead of Woo's formatted
+  local date string, preventing imported YS CART order dates from shifting by
+  the site timezone.
+- Allow order overwrite imports to refresh `created_at` from the Woo source
+  package so re-imports can repair previously shifted historical orders.
+
 ## [0.7.6] - 2026-06-18
 
 ### Fixed

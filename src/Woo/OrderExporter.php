@@ -160,6 +160,15 @@ final class OrderExporter
 
     private function date($date): string
     {
-        return $date && method_exists($date, 'date') ? $date->date(DATE_ATOM) : '';
+        if (!$date) {
+            return '';
+        }
+
+        if (method_exists($date, 'getTimestamp')) {
+            $timestamp = (int)$date->getTimestamp();
+            return $timestamp > 0 ? gmdate(DATE_ATOM, $timestamp) : '';
+        }
+
+        return method_exists($date, 'date') ? $date->date(DATE_ATOM) : '';
     }
 }
