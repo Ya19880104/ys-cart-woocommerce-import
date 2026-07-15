@@ -53,11 +53,10 @@ final class CustomerExporter
         $processed = count($users);
         $done = $processed < $limit;
         $repo = new JobRepository();
-        $repo->updateProgress($jobId, [
+        $repo->updateProgressAndCursor($jobId, [
             'processed_count' => $alreadyProcessed + $processed,
             'success_count' => ((int)($cursor['success'] ?? 0)) + $processed,
-        ]);
-        $repo->updateCursor($jobId, [
+        ], [
             'page' => $page + 1,
             'processed' => $alreadyProcessed + $processed,
             'success' => ((int)($cursor['success'] ?? 0)) + $processed,

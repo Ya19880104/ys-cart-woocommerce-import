@@ -16,12 +16,15 @@ final class OrderImporter
 {
     private const YS_ORDER = '\YangSheep\Ecommerce\Models\YSOrder';
     private const YS_PRODUCT = '\YangSheep\Ecommerce\Models\YSProduct';
+    private const YS_CUSTOMER = '\YangSheep\Ecommerce\Models\YSCustomer';
 
     public function importBatch(int $jobId, array $options, array $cursor, array $limits): array
     {
         if (!class_exists(self::YS_ORDER) || !class_exists(self::YS_PRODUCT)) {
             return ['done' => true, 'message' => 'YS CART order/product models are not available.'];
         }
+
+        $this->assertCustomerStatsContract();
 
         $filePath = (string)($options['file_path'] ?? '');
         if ($filePath === '') {
@@ -74,16 +77,17 @@ final class OrderImporter
             }
         }
 
+        $this->flushCustomerStats();
+
         $newOffset = $offset + $processed;
         $done = $processed < $limit;
         $totalSkipped = ((int)($cursor['skipped'] ?? 0)) + $skipped;
         $repo = new JobRepository();
-        $repo->updateProgress($jobId, [
+        $repo->updateProgressAndCursor($jobId, [
             'processed_count' => $newOffset,
             'success_count' => ((int)($cursor['success'] ?? 0)) + $success,
             'error_count' => ((int)($cursor['errors'] ?? 0)) + ($processed - $success - $skipped),
-        ]);
-        $repo->updateCursor($jobId, [
+        ], [
             'offset' => $newOffset,
             'success' => ((int)($cursor['success'] ?? 0)) + $success,
             'errors' => ((int)($cursor['errors'] ?? 0)) + ($processed - $success - $skipped),
@@ -132,6 +136,7 @@ final class OrderImporter
             ]);
             $orderSources->upsertWooOrder($existingSourceOrderId, $fingerprint, $record);
             (new DownloadPermissionBackfiller())->backfillFromOrderRecord($jobId, $fingerprint, $existingSourceOrderId, $record);
+            $this->queueCustomerStatsForOrder($existingSourceOrderId);
             return $existingSourceOrderId;
         }
 
@@ -148,6 +153,7 @@ final class OrderImporter
             // import flow 不中斷。這是 race / 孤兒 map 的容忍策略、刻意不 throw。
             $orderSources->upsertWooOrder((int)$existingMap->target_id, $fingerprint, $record);
             (new DownloadPermissionBackfiller())->backfillFromOrderRecord($jobId, $fingerprint, (int)$existingMap->target_id, $record);
+            $this->queueCustomerStatsForOrder((int)$existingMap->target_id);
             return (int)$existingMap->target_id;
         }
 
@@ -244,17 +250,10 @@ final class OrderImporter
             $data = OrderMapper::mapOrder($record, $customer['customer_id'], $customer['user_id'], $statusMap);
             unset($data['order_number']); // 保留 YS 單號；created_at 以來源 Woo 時間修正。
 
-            // 鏡射核心 YSOrder::create 的 JSON 欄位序列化（直接 $wpdb->update 不會自動編碼）。
-            foreach (['payment_detail', 'discount_ids'] as $jsonField) {
-                if (isset($data[$jsonField]) && is_array($data[$jsonField])) {
-                    $data[$jsonField] = wp_json_encode($data[$jsonField]);
-                }
-            }
-            $data['updated_at'] = current_time('mysql');
-
-            $table = $orderClass::table();
-            $updated = $wpdb->update($table, $data, ['id' => $orderId]);
-            if (false === $updated) {
+            // Use the core update contract so cache invalidation and old/new
+            // customer stats scheduling stay identical to native orders.
+            $updated = $orderClass::update($orderId, $data);
+            if (!$updated) {
                 throw new \RuntimeException('Unable to overwrite YS CART order #' . $orderId . '.');
             }
 
@@ -279,6 +278,59 @@ final class OrderImporter
                 $orderClass::add_item($orderId, OrderMapper::mapItem($item, $target['product_id'], $target['variant_id']));
             }
         });
+    }
+
+    /**
+     * Flush the customer-stats queue exposed by YS CART 2.56.1+.
+     */
+    private function flushCustomerStats(): void
+    {
+        $customerClass = self::YS_CUSTOMER;
+        $this->assertCustomerStatsContract();
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $result = $customerClass::flush_order_stats_recalculations();
+            if (is_array($result) && (int)($result['failed'] ?? 0) === 0) {
+                return;
+            }
+
+            if ($attempt < 3) {
+                usleep(50000 * $attempt);
+            }
+        }
+
+        throw new \RuntimeException('Unable to refresh one or more YS CART customer order statistics after three attempts.');
+    }
+
+    /**
+     * Requeue the authoritative customer for an already imported order.
+     */
+    private function queueCustomerStatsForOrder(int $orderId): void
+    {
+        $orderClass = self::YS_ORDER;
+        $customerClass = self::YS_CUSTOMER;
+        if (!method_exists($orderClass, 'find') || !method_exists($customerClass, 'queue_order_stats_recalculation')) {
+            throw new \RuntimeException('Customer statistics synchronization requires YS CART 2.56.1 or later.');
+        }
+
+        $order = $orderClass::find($orderId);
+        $customerId = (int)($order->customer_id ?? 0);
+        if ($customerId > 0) {
+            $customerClass::queue_order_stats_recalculation($customerId);
+        }
+    }
+
+    /**
+     * Fail before reading or writing package rows when the paired core is too old.
+     */
+    private function assertCustomerStatsContract(): void
+    {
+        $customerClass = self::YS_CUSTOMER;
+        if (!class_exists($customerClass)
+            || !method_exists($customerClass, 'queue_order_stats_recalculation')
+            || !method_exists($customerClass, 'flush_order_stats_recalculations')) {
+            throw new \RuntimeException('Customer statistics synchronization requires YS CART 2.56.1 or later.');
+        }
     }
 
     private function backfillExistingOrderShipping(int $orderId, array $record): void

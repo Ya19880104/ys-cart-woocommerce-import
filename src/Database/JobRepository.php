@@ -92,6 +92,23 @@ final class JobRepository
         ]);
     }
 
+    /**
+     * Persist batch counters and replay cursor in one checked database write.
+     */
+    public function updateProgressAndCursor(int $id, array $progress, array $cursor): void
+    {
+        global $wpdb;
+
+        $progress['cursor_json'] = wp_json_encode($cursor);
+        $progress['updated_at'] = current_time('mysql');
+        $result = $wpdb->update(TableMaker::jobsTable(), $progress, ['id' => $id]);
+        if (false === $result) {
+            throw new \RuntimeException(
+                'Unable to persist import progress and cursor: ' . (string)$wpdb->last_error
+            );
+        }
+    }
+
     public function complete(int $id): void
     {
         $this->update($id, [

@@ -69,12 +69,11 @@ final class CustomerImporter
         $newOffset = $offset + $processed;
         $done = $processed < $limit;
         $repo = new JobRepository();
-        $repo->updateProgress($jobId, [
+        $repo->updateProgressAndCursor($jobId, [
             'processed_count' => $newOffset,
             'success_count' => ((int)($cursor['success'] ?? 0)) + $success,
             'error_count' => ((int)($cursor['errors'] ?? 0)) + ($processed - $success),
-        ]);
-        $repo->updateCursor($jobId, [
+        ], [
             'offset' => $newOffset,
             'success' => ((int)($cursor['success'] ?? 0)) + $success,
             'errors' => ((int)($cursor['errors'] ?? 0)) + ($processed - $success),

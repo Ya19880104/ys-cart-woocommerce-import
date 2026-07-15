@@ -399,12 +399,11 @@ final class ProductImporter
     {
         $newOffset = $done ? $offset + $processed : $offset + $processed;
         $repo = new JobRepository();
-        $repo->updateProgress($jobId, [
+        $repo->updateProgressAndCursor($jobId, [
             'processed_count' => ((int)($cursor['processed'] ?? 0)) + $processed,
             'success_count' => ((int)($cursor['success'] ?? 0)) + $success,
             'error_count' => ((int)($cursor['errors'] ?? 0)) + ($processed - $success),
-        ]);
-        $repo->updateCursor($jobId, [
+        ], [
             'stage' => $stage,
             'offset' => $newOffset,
             'processed' => ((int)($cursor['processed'] ?? 0)) + $processed,

@@ -181,7 +181,10 @@ final class OrderMapper
             return $normalized;
         }
 
+        // v0.7.10：擴充別名表，涵蓋常見亞洲／跨境國家全名，避免 Japan／Singapore 等真實國別
+        //   被下方 TW fallback 靜默改成台灣（台灣店家跨境代購情境常見）。
         $aliases = [
+            // 既有
             'AUSTRALIA' => 'AU',
             'MALAYSIA' => 'MY',
             'MYR' => 'MY',
@@ -191,6 +194,38 @@ final class OrderMapper
             'UNITED STATES' => 'US',
             'UNITED STATES OF AMERICA' => 'US',
             'USA' => 'US',
+            // 台灣
+            'TAIWAN' => 'TW',
+            'TAIWAN, PROVINCE OF CHINA' => 'TW',
+            'REPUBLIC OF CHINA' => 'TW',
+            // 東亞
+            'JAPAN' => 'JP',
+            'SOUTH KOREA' => 'KR',
+            'KOREA' => 'KR',
+            'KOREA, REPUBLIC OF' => 'KR',
+            'CHINA' => 'CN',
+            "CHINA, PEOPLE'S REPUBLIC OF" => 'CN',
+            'HONG KONG' => 'HK',
+            'MACAU' => 'MO',
+            'MACAO' => 'MO',
+            // 東南亞
+            'SINGAPORE' => 'SG',
+            'THAILAND' => 'TH',
+            'VIETNAM' => 'VN',
+            'VIET NAM' => 'VN',
+            'INDONESIA' => 'ID',
+            'PHILIPPINES' => 'PH',
+            'CAMBODIA' => 'KH',
+            'MYANMAR' => 'MM',
+            'BRUNEI' => 'BN',
+            'LAOS' => 'LA',
+            // 南亞
+            'INDIA' => 'IN',
+            // 其他常見
+            'CANADA' => 'CA',
+            'GERMANY' => 'DE',
+            'FRANCE' => 'FR',
+            'JAPAN (JP)' => 'JP',
         ];
 
         if (isset($aliases[$normalized])) {
@@ -201,6 +236,8 @@ final class OrderMapper
             return 'TW';
         }
 
+        // Fallback：無法辨識者一律視為台灣（刻意保留 —— 處理台灣店家歷史髒資料
+        // 如 TW450／email 字串等；見 0.7.5）。真實非台灣國別請補上別名表。
         return 'TW';
     }
 

@@ -5,6 +5,16 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.10] - 2026-06-22
+
+### Changed
+- **擴充國別代碼別名表**：補上常見亞洲與跨境國家全名（Japan／Singapore／Hong Kong／China／Korea／Thailand／Vietnam／Indonesia／Philippines／India／Canada／Macau 等），避免這些真實國別被「無法辨識 → 一律台灣」的 fallback 靜默改成 TW。無法辨識者仍 fallback 台灣（刻意保留，處理台灣店家歷史髒資料如 TW450／email 字串）。
+
+### Fixed
+
+- Require the YS CART 2.56.1 customer-stat contract before reading or writing an order batch, route overwritten orders through the core update contract, and flush affected customers before advancing the cursor.
+- Retry failed customer-stat flushes three times, fail the batch without advancing on exhaustion, and save progress plus cursor through one checked database update.
+
 ## [0.7.9] - 2026-06-18
 
 ### Fixed
