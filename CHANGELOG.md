@@ -5,6 +5,14 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.11] - 2026-07-28
+
+### Fixed
+
+- Stop the bundled YS Hub Client library from declaring WooCommerce HPOS
+  compatibility with its vendor file path. The importer retains its own valid
+  declaration from the registered main plugin file.
+
 ## [0.7.10] - 2026-06-22
 
 ### Changed
