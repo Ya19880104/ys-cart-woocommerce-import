@@ -5,7 +5,7 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
-## [Unreleased]
+## [0.7.12] - 2026-08-27
 
 ### Changed
 
@@ -19,8 +19,7 @@ uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 ### Compatibility
 
 - Route callbacks, permissions, job execution, packages, SQL backups, and import
-  behavior are unchanged. The plugin version remains `0.7.11` until a release is
-  explicitly prepared.
+  behavior are unchanged.
 
 ## [0.7.11] - 2026-07-28
 
