@@ -39,9 +39,16 @@
 
 `工具 > YS CART WC 匯入`
 
-管理介面使用 REST 路由：
+管理介面使用 REST 路由。YS CART current Core 會透過共用 admin registrar 掛載在：
+
+`/wp-json/ys-ecommerce-headless/v1/admin/woocommerce-import`
+
+未載入 YS CART 或 Core 尚未提供 admin registrar 時，才使用相容 fallback：
 
 `/wp-json/ys-cart-wc-import/v1`
+
+兩者使用相同的 endpoint suffix、nonce、權限與 response contract；每個 request
+只會註冊其中一套 routes。
 
 ## SQL 備份
 

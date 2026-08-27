@@ -5,6 +5,23 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [Unreleased]
+
+### Changed
+
+- Register importer routes through the current YS CART admin REST registrar at
+  `/ys-ecommerce-headless/v1/admin/woocommerce-import`. The legacy
+  `/ys-cart-wc-import/v1` route set is now a priority-20 fallback only when the
+  Core registrar is unavailable or does not dispatch.
+- Localize both the `wp.apiFetch` path and absolute REST URL from the selected
+  route base, removing private-namespace literals from the admin script.
+
+### Compatibility
+
+- Route callbacks, permissions, job execution, packages, SQL backups, and import
+  behavior are unchanged. The plugin version remains `0.7.11` until a release is
+  explicitly prepared.
+
 ## [0.7.11] - 2026-07-28
 
 ### Fixed

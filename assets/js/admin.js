@@ -6,6 +6,12 @@
 
     window.wp.apiFetch.use(window.wp.apiFetch.createNonceMiddleware(window.ysCwciAdmin.nonce));
 
+    const apiPath = String(window.ysCwciAdmin.apiPath || '').replace(/\/+$/, '');
+    const restUrl = String(window.ysCwciAdmin.restUrl || '').replace(/\/+$/, '');
+    if (!apiPath || !restUrl) {
+        return;
+    }
+
     const capabilities = root.querySelector('[data-ys-cwci-capabilities]');
     const jobs = root.querySelector('[data-ys-cwci-jobs]');
     const uploadForm = root.querySelector('[data-ys-cwci-upload]');
@@ -140,7 +146,7 @@
         }
     };
 
-    const loadCapabilities = () => api('/ys-cart-wc-import/v1/capabilities')
+    const loadCapabilities = () => api(`${apiPath}/capabilities`)
         .then((data) => {
             renderCapabilities(data);
             setStatus('狀態已更新');
@@ -176,7 +182,7 @@
             const errors = Number(job.error_count || 0);
             const active = !isTerminal(status);
             const download = job.file_name
-                ? `<a class="ys-cwci-btn ys-cwci-btn--ghost ys-cwci-btn--sm" href="${escapeHtml(window.ysCwciAdmin.restUrl)}/jobs/${Number(job.id)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}">
+                ? `<a class="ys-cwci-btn ys-cwci-btn--ghost ys-cwci-btn--sm" href="${escapeHtml(restUrl)}/jobs/${Number(job.id)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}">
                     <span class="dashicons dashicons-download" aria-hidden="true"></span>下載
                 </a>`
                 : '';
@@ -215,7 +221,7 @@
         }).join('');
     };
 
-    const loadJobs = () => api('/ys-cart-wc-import/v1/jobs')
+    const loadJobs = () => api(`${apiPath}/jobs`)
         .then((items) => {
             renderJobs(items);
             return items;
@@ -243,7 +249,7 @@
 
         backups.innerHTML = items.map((backup) => {
             const file = String(backup.file || '');
-            const downloadUrl = `${window.ysCwciAdmin.restUrl}/backups/${encodeURIComponent(file)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}`;
+            const downloadUrl = `${restUrl}/backups/${encodeURIComponent(file)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}`;
             return `
                 <article class="ys-cwci-backup">
                     <div>
@@ -262,7 +268,7 @@
         }).join('');
     };
 
-    const loadBackups = () => api('/ys-cart-wc-import/v1/backups')
+    const loadBackups = () => api(`${apiPath}/backups`)
         .then((data) => {
             renderBackups(data.backups || []);
             return data.backups || [];
@@ -278,7 +284,7 @@
         setBusy(button, true);
         setStatus('正在建立 SQL 備份');
         try {
-            const result = await api('/ys-cart-wc-import/v1/backups', { method: 'POST' });
+            const result = await api(`${apiPath}/backups`, { method: 'POST' });
             if (result.error) {
                 throw new Error(result.message || '建立備份失敗。');
             }
@@ -297,7 +303,7 @@
         }
         setBusy(button, true);
         try {
-            await api(`/ys-cart-wc-import/v1/backups/${encodeURIComponent(file)}`, { method: 'DELETE' });
+            await api(`${apiPath}/backups/${encodeURIComponent(file)}`, { method: 'DELETE' });
             setStatus('備份已刪除');
             await loadBackups();
         } catch (error) {
@@ -316,7 +322,7 @@
         setBusy(button, true);
         setStatus('正在還原 SQL 備份');
         try {
-            const result = await api(`/ys-cart-wc-import/v1/backups/${encodeURIComponent(file)}/restore`, {
+            const result = await api(`${apiPath}/backups/${encodeURIComponent(file)}/restore`, {
                 method: 'POST',
                 data: { confirm: 'RESTORE' }
             });
@@ -328,13 +334,13 @@
         }
     };
 
-    const getJob = (id) => api(`/ys-cart-wc-import/v1/jobs/${id}`);
+    const getJob = (id) => api(`${apiPath}/jobs/${id}`);
 
     const runNext = async (id, button) => {
         setBusy(button, true);
         setStatus(`#${id} 執行下一批`);
         try {
-            await api(`/ys-cart-wc-import/v1/jobs/${id}/run-next`, { method: 'POST' });
+            await api(`${apiPath}/jobs/${id}/run-next`, { method: 'POST' });
             await loadJobs();
             setStatus(`#${id} 批次完成，狀態已更新`);
         } catch (error) {
@@ -356,7 +362,7 @@
 
         try {
             for (let step = 0; step < 1000; step++) {
-                await api(`/ys-cart-wc-import/v1/jobs/${id}/run-next`, { method: 'POST' });
+                await api(`${apiPath}/jobs/${id}/run-next`, { method: 'POST' });
                 const job = await getJob(id);
                 await loadJobs();
                 setStatus(`#${id} ${statusLabels[job.status] || job.status}，已處理 ${Number(job.processed_count || 0)} 筆`);
@@ -378,7 +384,7 @@
         setBusy(button, true);
         const panel = root.querySelector(`[data-ys-cwci-job-details="${id}"]`);
         try {
-            const errors = await api(`/ys-cart-wc-import/v1/jobs/${id}/errors`);
+            const errors = await api(`${apiPath}/jobs/${id}/errors`);
             if (panel) {
                 panel.hidden = false;
                 panel.innerHTML = Array.isArray(errors) && errors.length
@@ -407,7 +413,7 @@
             const entity = exportButton.getAttribute('data-ys-cwci-export');
             setBusy(exportButton, true);
             setStatus(`建立 ${entityLabels[entity] || entity} 匯出工作`);
-            api('/ys-cart-wc-import/v1/export-jobs', {
+            api(`${apiPath}/export-jobs`, {
                 method: 'POST',
                 data: { entity, options: {} }
             }).then((job) => {
@@ -473,7 +479,7 @@
             if (statusSel.map && Object.keys(statusSel.map).length) { options.status_map = statusSel.map; }
         }
         setStatus('建立匯入工作');
-        return api('/ys-cart-wc-import/v1/import-jobs', { method: 'POST', data: { entity, options } })
+        return api(`${apiPath}/import-jobs`, { method: 'POST', data: { entity, options } })
             .then((job) => {
                 const jobId = Number(job?.id || 0);
                 setStatus(`${entityLabels[entity] || entity} 匯入工作已建立，開始自動執行`);
@@ -545,7 +551,7 @@
                 uploadResult.textContent = '上傳中...';
             }
 
-            fetch(`${window.ysCwciAdmin.restUrl}/packages/upload`, {
+            fetch(`${restUrl}/packages/upload`, {
                 method: 'POST',
                 credentials: 'same-origin',
                 headers: { 'X-WP-Nonce': window.ysCwciAdmin.nonce },
@@ -572,7 +578,7 @@
                     // v0.7.0：訂單先列出狀態供勾選（預設全選），未對應狀態詢問對應後才匯入。
                     if (entity === 'orders') {
                         setStatus('掃描套件內的訂單狀態');
-                        return api('/ys-cart-wc-import/v1/packages/order-statuses', {
+                        return api(`${apiPath}/packages/order-statuses`, {
                             method: 'POST',
                             data: { file_path: fileInfo.file_path }
                         }).then((statusData) => {
@@ -691,7 +697,7 @@
             if (saved && saved.flow !== this.flow) { saved = null; }
             let unfinished = [];
             try {
-                const items = await api('/ys-cart-wc-import/v1/jobs');
+                const items = await api(`${apiPath}/jobs`);
                 unfinished = (Array.isArray(items) ? items : [])
                     .filter((job) => !isTerminal(job.status))
                     .map((job) => ({ ...job, opts: safeParse(job.options_json) || {} }))
@@ -900,7 +906,7 @@
 
         async runJobToEnd(jobId, phaseLabel) {
             for (let i = 0; i < 2000; i++) {
-                await api(`/ys-cart-wc-import/v1/jobs/${jobId}/run-next`, { method: 'POST' });
+                await api(`${apiPath}/jobs/${jobId}/run-next`, { method: 'POST' });
                 const job = await getJob(jobId);
                 const pct = progressOf(job);
                 this.progress(pct, `${phaseLabel}：已處理 ${Number(job.processed_count || 0)} 筆（成功 ${Number(job.success_count || 0)}、錯誤 ${Number(job.error_count || 0)}）`);
@@ -920,7 +926,7 @@
             }
             let data;
             try {
-                data = await api('/ys-cart-wc-import/v1/packages/order-statuses', { method: 'POST', data: { file_path: filePath } });
+                data = await api(`${apiPath}/packages/order-statuses`, { method: 'POST', data: { file_path: filePath } });
             } catch (error) {
                 this.log(`狀態掃描失敗（${error.message || error}），將匯入全部狀態。`);
                 return { include: [], map: {} };
@@ -985,7 +991,7 @@
                 if (Array.isArray(statusSel.include) && statusSel.include.length) { options.status_include = statusSel.include; }
                 if (statusSel.map && Object.keys(statusSel.map).length) { options.status_map = statusSel.map; }
             }
-            const importJob = await api('/ys-cart-wc-import/v1/import-jobs', { method: 'POST', data: { entity, options } });
+            const importJob = await api(`${apiPath}/import-jobs`, { method: 'POST', data: { entity, options } });
             const done = await this.runJobToEnd(Number(importJob.id), `匯入${entityLabels[entity]}`);
             if (String(done.status) !== 'completed') {
                 throw new Error(`匯入未完成（${statusLabels[done.status] || done.status}）`);
@@ -1019,14 +1025,14 @@
             try {
                 if (step.kind === 'export' || step.kind === 'direct') {
                     this.progress(0, '建立匯出工作…');
-                    const exportJob = await api('/ys-cart-wc-import/v1/export-jobs', { method: 'POST', data: { entity, options: { wizard: this.flow } } });
+                    const exportJob = await api(`${apiPath}/export-jobs`, { method: 'POST', data: { entity, options: { wizard: this.flow } } });
                     const doneExport = await this.runJobToEnd(Number(exportJob.id), `匯出${entityLabels[entity]}`);
                     if (String(doneExport.status) !== 'completed') {
                         throw new Error(`匯出未完成（${statusLabels[doneExport.status] || doneExport.status}）`);
                     }
                     this.log(`匯出完成：成功 ${Number(doneExport.success_count || 0)} 筆`);
                     if (step.kind === 'export') {
-                        const downloadUrl = `${window.ysCwciAdmin.restUrl}/jobs/${Number(doneExport.id)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}`;
+                        const downloadUrl = `${restUrl}/jobs/${Number(doneExport.id)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}`;
                         this.results[entity] = { success: Number(doneExport.success_count || 0), errors: Number(doneExport.error_count || 0), downloadUrl };
                         this.log('套件已就緒，可於完成頁下載。');
                     } else {
@@ -1041,7 +1047,7 @@
                     const formData = new FormData();
                     formData.append('package', fileInput.files[0]);
                     formData.append('entity', entity);
-                    const uploadResponse = await fetch(`${window.ysCwciAdmin.restUrl}/packages/upload`, {
+                    const uploadResponse = await fetch(`${restUrl}/packages/upload`, {
                         method: 'POST', credentials: 'same-origin',
                         headers: { 'X-WP-Nonce': window.ysCwciAdmin.nonce }, body: formData
                     });
@@ -1099,7 +1105,7 @@
                         const mode = (job.opts && job.opts.mode === 'overwrite') ? 'overwrite' : this.retryMode;
                         await this.directImportPhase(step, String(done.file_path || ''), mode);
                     } else if (job.type === 'export') {
-                        const downloadUrl = `${window.ysCwciAdmin.restUrl}/jobs/${Number(done.id)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}`;
+                        const downloadUrl = `${restUrl}/jobs/${Number(done.id)}/download?_wpnonce=${encodeURIComponent(window.ysCwciAdmin.nonce)}`;
                         this.results[entity] = { success: Number(done.success_count || 0), errors: Number(done.error_count || 0), downloadUrl };
                     } else {
                         const cursor = safeParse(done.cursor_json) || {};
@@ -1122,7 +1128,7 @@
             const pending = this.pendingResume || {};
             const unfinished = Array.isArray(pending.unfinished) ? pending.unfinished : [];
             for (const job of unfinished) {
-                try { await api(`/ys-cart-wc-import/v1/jobs/${Number(job.id)}/cancel`, { method: 'POST' }); } catch (e) { /* 不阻擋 */ }
+                try { await api(`${apiPath}/jobs/${Number(job.id)}/cancel`, { method: 'POST' }); } catch (e) { /* 不阻擋 */ }
             }
             this.pendingResume = null;
             this.clearState();
@@ -1203,7 +1209,7 @@
             if (action === 'backup') {
                 setBusy(btn, true);
                 try {
-                    const result = await api('/ys-cart-wc-import/v1/backups', { method: 'POST' });
+                    const result = await api(`${apiPath}/backups`, { method: 'POST' });
                     if (result.error) { throw new Error(result.message || '建立備份失敗。'); }
                     wizard.log(`備份已建立：${result.backup?.file || ''}`);
                     await loadBackups();
@@ -1225,7 +1231,7 @@
 
     Promise.all([loadCapabilities(), loadJobs(), loadBackups()]).then(() => {
         // 精靈需要 capabilities 決定流程 — 再抓一次（renderCapabilities 沒回傳資料）
-        return api('/ys-cart-wc-import/v1/capabilities');
+        return api(`${apiPath}/capabilities`);
     }).then((caps) => {
         if (wizard) { return wizard.bootWithResume(caps); }
         return undefined;

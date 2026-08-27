@@ -17,7 +17,18 @@
 
 AI 或 MCP client 第一個呼叫：
 
-`GET /wp-json/ys-cart-wc-import/v1/capabilities`
+current YS CART Core 的 canonical base 是：
+
+`/wp-json/ys-ecommerce-headless/v1/admin/woocommerce-import`
+
+未載入 YS CART 或舊 Core 未提供 admin registrar 時，才 fallback 到：
+
+`/wp-json/ys-cart-wc-import/v1`
+
+以下流程以 canonical base 表示；fallback 的 endpoint suffix 與 request/response
+contract 完全相同。
+
+`GET /wp-json/ys-ecommerce-headless/v1/admin/woocommerce-import/capabilities`
 
 回應欄位：
 
@@ -43,7 +54,7 @@ AI 或 MCP client 第一個呼叫：
 
 ### 建立匯出 job
 
-`POST /wp-json/ys-cart-wc-import/v1/export-jobs`
+`POST /wp-json/ys-ecommerce-headless/v1/admin/woocommerce-import/export-jobs`
 
 ```json
 {
@@ -60,7 +71,7 @@ AI 或 MCP client 第一個呼叫：
 
 ### 建立匯入 job
 
-`POST /wp-json/ys-cart-wc-import/v1/import-jobs`
+`POST /wp-json/ys-ecommerce-headless/v1/admin/woocommerce-import/import-jobs`
 
 ```json
 {
@@ -77,7 +88,7 @@ AI 或 MCP client 第一個呼叫：
 
 ### 執行下一批
 
-`POST /wp-json/ys-cart-wc-import/v1/jobs/{id}/run-next`
+`POST /wp-json/ys-ecommerce-headless/v1/admin/woocommerce-import/jobs/{id}/run-next`
 
 AI 應重複呼叫直到 job status 為：
 
@@ -87,11 +98,11 @@ AI 應重複呼叫直到 job status 為：
 
 ### 查詢 job
 
-`GET /wp-json/ys-cart-wc-import/v1/jobs/{id}`
+`GET /wp-json/ys-ecommerce-headless/v1/admin/woocommerce-import/jobs/{id}`
 
 ### 查詢錯誤
 
-`GET /wp-json/ys-cart-wc-import/v1/jobs/{id}/errors`
+`GET /wp-json/ys-ecommerce-headless/v1/admin/woocommerce-import/jobs/{id}/errors`
 
 ## 建議 AI Skill 行為
 

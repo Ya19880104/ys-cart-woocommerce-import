@@ -33,9 +33,13 @@ final class Plugin
 
         $this->initialized = true;
 
-        add_action('admin_menu', [new AdminPage(), 'register'], 30);
-        add_action('admin_enqueue_scripts', [new AdminPage(), 'enqueue']);
-        add_action('rest_api_init', [new RestController(), 'registerRoutes']);
+        $adminPage = new AdminPage();
+        $restController = new RestController();
+
+        add_action('admin_menu', [$adminPage, 'register'], 30);
+        add_action('admin_enqueue_scripts', [$adminPage, 'enqueue']);
+        add_action('ys_ec_register_admin_rest_routes', [$restController, 'registerCoreRoutes'], 10, 1);
+        add_action('rest_api_init', [$restController, 'registerFallbackRoutes'], 20);
         add_action(Scheduler::HOOK_RUN_JOB, [new JobRunner(), 'runScheduledJob'], 10, 1);
 
         // v0.2.3: GDPR cascade — listen for ys-cart core ≥ 2.45.43 `ys_ec_order_deleted`

@@ -5,6 +5,8 @@ namespace YangSheep\YsCartWooImport\Admin;
 
 defined('ABSPATH') || exit;
 
+use YangSheep\YsCartWooImport\Rest\RestController;
+
 final class AdminPage
 {
     public const SLUG = 'ys-ec-woo-import';
@@ -90,8 +92,11 @@ final class AdminPage
             true
         );
 
+        $apiPath = RestController::apiPath();
+
         wp_localize_script('ys-cwci-admin', 'ysCwciAdmin', [
-            'restUrl' => esc_url_raw(rest_url('ys-cart-wc-import/v1')),
+            'apiPath' => $apiPath,
+            'restUrl' => esc_url_raw(rest_url(ltrim($apiPath, '/'))),
             'nonce' => wp_create_nonce('wp_rest'),
             // v0.6.0 精靈模式：同站直轉的 import job 需要與 export manifest 相同的
             // source fingerprint（hash of home_url）；由 PHP 算好傳下去，避免 JS 端
