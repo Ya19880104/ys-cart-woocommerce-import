@@ -346,15 +346,48 @@ final class ProductImporter
         }
 
         $storage = \YangSheep\Ecommerce\Storage\YSProtectedStorage::digital();
+        $prefix = $this->sanitizeFileName($sourceProductId . '-' . $sourceDownloadId);
+        $desired = $prefix . '-' . $fileName;
+
+        // YS CART 2.59.9 起，Core 的受保護儲存區把新檔依 YYYY/MM 分月存放。有這組 API 時就沿用它，
+        // 回傳含年月的相對 key —— 呼叫端把這個 key 原樣寫進 digital_files.file_path，不必另外處理。
+        // 舊 Core 沒有 new_key()/ensure_for_key() 時維持原本的平放行為：年月改善以新 Core API 為前提。
+        if (method_exists($storage, 'new_key') && method_exists($storage, 'ensure_for_key')) {
+            $key = $storage->new_key($desired);
+            if ($key === '') {
+                return null;
+            }
+
+            // ensure_for_key() 內部已經呼叫過 ensure()（可寫性與隔離判定都在裡面），這裡不重複呼叫；
+            // 回空字串代表該位置不可用，一律 fail-closed。
+            $monthPath = $storage->ensure_for_key($key);
+            if ($monthPath === '') {
+                return null;
+            }
+
+            // 碰撞檢查必須針對**該月份目錄**而不是用途根：不同月份的同名檔不該互相讓位，
+            // 只有同一個月份內的同名檔才需要補 -1 / -2。
+            $monthDir = \dirname($monthPath);
+            $targetName = function_exists('wp_unique_filename')
+                ? wp_unique_filename($monthDir, $desired)
+                : $desired;
+            $targetPath = $monthDir . '/' . $targetName;
+
+            if (!copy($localPath, $targetPath)) {
+                return null;
+            }
+
+            return ['key' => \dirname($key) . '/' . $targetName, 'path' => $targetPath];
+        }
+
         $dir = $storage->ensure();
         if ($dir === '') {
             return null;
         }
 
-        $prefix = $this->sanitizeFileName($sourceProductId . '-' . $sourceDownloadId);
         $targetName = function_exists('wp_unique_filename')
-            ? wp_unique_filename($dir, $prefix . '-' . $fileName)
-            : $prefix . '-' . $fileName;
+            ? wp_unique_filename($dir, $desired)
+            : $desired;
         $targetPath = rtrim($dir, '/\\') . '/' . $targetName;
 
         if (!copy($localPath, $targetPath)) {

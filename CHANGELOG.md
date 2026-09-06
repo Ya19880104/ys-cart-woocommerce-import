@@ -5,6 +5,24 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.13] - 2026-09-07
+
+### Changed
+
+- Copy migrated WooCommerce digital downloads through the YS CART protected
+  storage year/month key API when the core plugin exposes it. New files are
+  written under `YYYY/MM/` inside the digital area, the unique-filename check
+  runs against that month directory, and the returned `YYYY/MM/<file>` key is
+  what the imported download row stores.
+
+### Compatibility
+
+- Cores without the year/month key API keep the previous flat layout, so the
+  month partitioning is conditional on the newer core storage API.
+- Existing flat storage keys stay readable and no stored file is moved.
+- When the storage layer cannot confirm the target location is protected it
+  returns no writable path, and the copy is refused without writing a payload.
+
 ## [0.7.12] - 2026-08-27
 
 ### Changed
