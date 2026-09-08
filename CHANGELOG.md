@@ -5,6 +5,22 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.14] - Unreleased
+
+### Fixed
+
+- Treat a refused YS CART product update as an import error. The existing
+  transaction rolls back before attributes, mappings or digital downloads are
+  changed; the failed row is no longer counted as successfully imported.
+
+### Compatibility
+
+- This corrects failure reporting and preserves the existing import transaction.
+  Product import with Core 2.61's native catalog transaction owner still needs
+  a separate compatibility update; keep that import producer paused during the
+  Core 2.61 rollout. Successful updates on compatible cores retain their prior
+  commit behavior.
+
 ## [0.7.13] - 2026-09-07
 
 ### Changed

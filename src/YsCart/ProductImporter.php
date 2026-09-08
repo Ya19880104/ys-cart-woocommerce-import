@@ -116,7 +116,9 @@ final class ProductImporter
                     (new MapRepository())->upsert($jobId, $fingerprint, 'product', (string)$record['source_id'], (int)$existing->id, 'ys_product');
                     return (int)$existing->id;
                 }
-                $class::update((int)$existing->id, $data);
+                if (false === $class::update((int)$existing->id, $data)) {
+                    throw new \RuntimeException('Unable to update YS CART product.');
+                }
                 $productId = (int)$existing->id;
             } else {
                 $productId = (int)$class::create($data);
