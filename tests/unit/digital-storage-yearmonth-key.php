@@ -1,9 +1,9 @@
 <?php
 /**
  * ProductImporter::copyToDigitalStorage() 必須把匯入的數位檔交給 YS CART Core 的受保護儲存區，
- * 並在 Core 具備年月 API 時寫進 YYYY/MM，回傳含年月的相對 key（既有的 DB 寫入原樣搬用該 key）。
+ * 並在目前 Core 的年月 API 下寫進 YYYY/MM/<random>/，回傳完整相對 key。
  *
- * 本檔用**真的 Core `YSProtectedStorage`**（2.59.9 / 97d3fbf 的 API）與真的檔案系統，只把 WordPress
+ * 本檔用**真的 Core `YSProtectedStorage`**（目前年月／隨機子目錄 API）與真的檔案系統，只把 WordPress
  * helpers（`wp_upload_dir` / option / `wp_mkdir_p` / `wp_remote_*` / `wp_unique_filename`）換成替身。
  * 沒有真實 HTTP 往返：隔離判定由替身的「伺服器模式」決定，因此本檔不代表任何站台的實際隔離狀態。
  *
@@ -35,6 +35,7 @@ $GLOBALS['ys_wci_ym'] = [
     'uploads' => $tmp . '/uploads',
     'serve' => 'denied',   // denied | open
     'options' => [],
+    'deny_mkdir' => false,
 ];
 
 // ── WordPress 替身 ─────────────────────────────────────────────────────────
@@ -102,6 +103,7 @@ if (!function_exists('get_option')) {
 if (!function_exists('wp_mkdir_p')) {
     function wp_mkdir_p(string $dir): bool
     {
+        if ($GLOBALS['ys_wci_ym']['deny_mkdir']) { return false; }
         return is_dir($dir) || mkdir($dir, 0777, true);
     }
 }
@@ -168,7 +170,7 @@ if (!function_exists('wp_unique_filename')) {
     }
 }
 
-// ── Core 儲存區：new 模式載入真 97d3 類別；old 模式先放一個只有舊 API 的替身 ──
+// ── Core 儲存區：new 模式載入真現行類別；old 模式只有舊 API 的替身 ──
 $coreClass = '\\YangSheep\\Ecommerce\\Storage\\YSProtectedStorage';
 
 if ($mode === 'new') {
@@ -236,7 +238,7 @@ $fail = static function (string $message): void {
 
 // ══════════════════════════════════════════════════════════════════════════
 if ($mode === 'new') {
-    // N1 — 隔離已證明時，新檔寫進 YYYY/MM，回傳含年月的相對 key，內容一致
+    // N1 — 新檔寫進 YYYY/MM/<random>，回傳完整相對 key，內容一致。
     $GLOBALS['ys_wci_ym']['serve'] = 'denied';
     $src = $makeSource('a.txt', 'payload-A');
     $stored = $copy($src, 'a.txt');
@@ -244,8 +246,8 @@ if ($mode === 'new') {
     if (!is_array($stored)) {
         $fail('N1: copyToDigitalStorage must return an array when the storage area is usable.');
     }
-    if (preg_match('#^[0-9]{4}/(0[1-9]|1[0-2])/[^/]+$#D', (string)$stored['key']) !== 1) {
-        $fail('N1: returned key must be a YYYY/MM relative key, got: ' . var_export($stored['key'], true));
+    if (preg_match('#^[0-9]{4}/(0[1-9]|1[0-2])/[a-f0-9]{32}/[^/]+$#D', (string)$stored['key']) !== 1) {
+        $fail('N1: returned key must be a YYYY/MM/32-hex/file relative key, got: ' . var_export($stored['key'], true));
     }
     if (!is_file((string)$stored['path'])) {
         $fail('N1: returned path must exist on disk.');
@@ -264,7 +266,7 @@ if ($mode === 'new') {
         $fail('N1b: Core resolve() of the returned key must find the same file.');
     }
 
-    // N2 — 同名兩檔：碰撞必須對「月份目錄」檢查，兩檔並存且都在同一個月份目錄
+    // N2 — 同名兩檔保留在同年月下的不同隨機子目錄，不能覆寫。
     $src2 = $makeSource('a2.txt', 'payload-B');
     $stored2 = $copy($src2, 'a.txt');
     if (!is_array($stored2)) {
@@ -273,8 +275,10 @@ if ($mode === 'new') {
     if ($stored2['key'] === $stored['key']) {
         $fail('N2: second file must get a distinct key, not overwrite the first.');
     }
-    if (dirname((string)$stored2['key']) !== dirname((string)$stored['key'])) {
-        $fail('N2: both files must live under the same YYYY/MM directory.');
+    if (preg_match('#^[0-9]{4}/(0[1-9]|1[0-2])/[a-f0-9]{32}/[^/]+$#D', (string)$stored2['key']) !== 1
+        || dirname((string)$stored2['key'], 2) !== dirname((string)$stored['key'], 2)
+        || dirname((string)$stored2['key']) === dirname((string)$stored['key'])) {
+        $fail('N2: both files must retain distinct random buckets under the same YYYY/MM directory.');
     }
     if (!is_file((string)$stored['path']) || hash_file('sha256', (string)$stored['path']) !== hash('sha256', 'payload-A')) {
         $fail('N2: the first file must survive untouched.');
@@ -283,29 +287,28 @@ if ($mode === 'new') {
         $fail('N2: the second file must hold its own content.');
     }
 
-    // N3 — 隔離未被證明時 fail-closed：回 null，且不留下任何新檔
+    // N3 — 現行 Core 隔離診斷是 advisory；open 不取代目錄可寫性判定。
     $GLOBALS['ys_wci_ym']['serve'] = 'open';
-    $GLOBALS['ys_wci_ym']['options'] = [];   // 清掉已記錄的隔離狀態，強迫重新判定
-    $before = [];
-    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($GLOBALS['ys_wci_ym']['uploads'], FilesystemIterator::SKIP_DOTS));
-    foreach ($it as $f) {
-        $before[] = $f->getPathname();
+    $GLOBALS['ys_wci_ym']['options'] = [];
+    if ($coreClass::digital()->probe_isolation() !== 'open') {
+        $fail('N3: synthetic open-server control must report open.');
     }
     $src3 = $makeSource('c.txt', 'payload-C');
-    $blocked = $copy($src3, 'c.txt');
-    if ($blocked !== null) {
-        $fail('N3: copyToDigitalStorage must return null when the storage area refuses to be used.');
+    $advisory = $copy($src3, 'c.txt');
+    if (!is_array($advisory) || !is_file((string)$advisory['path'])
+        || hash_file('sha256', (string)$advisory['path']) !== hash('sha256', 'payload-C')
+        || $coreClass::digital()->resolve((string)$advisory['key']) !== $advisory['path']) {
+        $fail('N3: advisory isolation must retain normal keyed copy and readback.');
     }
-    $after = [];
-    $it2 = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($GLOBALS['ys_wci_ym']['uploads'], FilesystemIterator::SKIP_DOTS));
-    foreach ($it2 as $f) {
-        $after[] = $f->getPathname();
+    // 真正無法建立目錄時仍拒絕 copy；不因 advisory 而放寬實體儲存失敗。
+    $uploads = $GLOBALS['ys_wci_ym']['uploads'];
+    $GLOBALS['ys_wci_ym']['uploads'] = $tmp . '/unavailable-uploads';
+    $GLOBALS['ys_wci_ym']['deny_mkdir'] = true;
+    if ($copy($src3, 'blocked.txt') !== null || file_exists($GLOBALS['ys_wci_ym']['uploads'])) {
+        $fail('N3b: unavailable storage must return null without writing a payload.');
     }
-    $added = array_values(array_diff($after, $before));
-    $addedPayload = array_values(array_filter($added, static fn(string $p): bool => is_file($p) && file_get_contents($p) === 'payload-C'));
-    if ($addedPayload !== []) {
-        $fail('N3: no imported payload may be written while the area is refused: ' . implode(', ', $addedPayload));
-    }
+    $GLOBALS['ys_wci_ym']['uploads'] = $uploads;
+    $GLOBALS['ys_wci_ym']['deny_mkdir'] = false;
 
     // N4 — 舊的平面 key 仍讀得到（Core 三 root 相容；本修正不搬舊檔）
     $GLOBALS['ys_wci_ym']['serve'] = 'denied';
@@ -374,11 +377,5 @@ if ($mode === 'new') {
     echo "digital-storage-yearmonth-key(old): OK\n";
 }
 
-// ── 清理暫存樹 ─────────────────────────────────────────────────────────────
-$rm = static function (string $dir) use (&$rm): void {
-    foreach (glob($dir . '/*') ?: [] as $entry) {
-        is_dir($entry) ? $rm($entry) : @unlink($entry);
-    }
-    @rmdir($dir);
-};
-$rm($tmp);
+// Preserve this run's isolated fixture for review; never recursively clean an inferred path.
+echo 'digital-storage fixture retained: ' . $tmp . "\n";

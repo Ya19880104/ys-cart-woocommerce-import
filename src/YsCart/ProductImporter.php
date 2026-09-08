@@ -74,7 +74,7 @@ final class ProductImporter
 
         $doneWithStage = $processed < $limit;
         if ($doneWithStage && $stage === 'products') {
-            $this->saveCursor($jobId, $cursor, 0, 0, $success, false, 'variants');
+            $this->saveCursor($jobId, $cursor, $offset, $processed, $success, false, 'variants');
             return ['done' => false, 'processed' => $processed, 'success' => $success, 'stage' => 'variants'];
         }
 
@@ -432,7 +432,8 @@ final class ProductImporter
 
     private function saveCursor(int $jobId, array $cursor, int $offset, int $processed, int $success, bool $done, string $stage = 'products'): void
     {
-        $newOffset = $done ? $offset + $processed : $offset + $processed;
+        $newOffset = $stage === 'variants' && ($cursor['stage'] ?? 'products') !== 'variants'
+            ? 0 : $offset + $processed;
         $repo = new JobRepository();
         $repo->updateProgressAndCursor($jobId, [
             'processed_count' => ((int)($cursor['processed'] ?? 0)) + $processed,

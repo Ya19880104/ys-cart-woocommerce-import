@@ -5,6 +5,20 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.15] - Unreleased
+
+### Fixed
+
+- Preserve the last product batch's processed, success and error totals when
+  continuing into variants. Only the variants cursor offset resets to zero;
+  completed product rows no longer disappear from the job counters.
+
+### Compatibility
+
+- Includes the 0.7.14 refused-update correction. Core 2.61 product creation and
+  update through this importer still require the separate transaction integration;
+  this progress correction does not enable that producer.
+
 ## [0.7.14] - Unreleased
 
 ### Fixed

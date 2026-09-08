@@ -106,16 +106,18 @@ namespace YangSheep\Ecommerce\Models {
 
 namespace YangSheep\YsCartWooImport\Packages {
     final class PackageReader {
+        public static int $productRows = 1;
         public function streamJsonLines(string $path, string $entry): \Generator {
+            if ('memory-only' === $path && 'product_variants.jsonl' === $entry) { return; }
             if ('memory-only' !== $path || 'products.jsonl' !== $entry) {
                 throw new \RuntimeException('unexpected fixture package request');
             }
-            yield [
+            for ($index = 0; $index < self::$productRows; ++$index) { yield [
                 'source_id' => 'woo-fixture-77', 'name' => 'Requested new title',
                 'sku' => 'FIXTURE-SKU-77', 'slug' => 'fixture-77', 'status' => 'publish',
                 'attributes' => [['name' => 'Imported', 'options' => ['New']]],
                 'downloads' => [],
-            ];
+            ]; }
         }
     }
 }
@@ -192,6 +194,47 @@ namespace {
     echo ($accepted_ok ? 'PASS ' : 'FAIL ') . "accepted update still commits attributes/map and reports success\n";
     $cases['accepted_update'] = ['result' => $accepted, 'pass' => $accepted_ok,
         'attributes_after' => $db->attributes, 'maps_after' => $db->maps, 'progress' => $db->progress, 'trace' => $db->trace];
+
+    foreach (['refused' => false, 'accepted' => true, 'skip' => true] as $kind => $accept) {
+        $db = new WooRefusalDb();
+        $GLOBALS['wpdb'] = $db;
+        YSProduct::$existing = true;
+        YSProduct::$update_result = $accept;
+        YSProduct::$calls = [];
+        \YangSheep\YsCartWooImport\Packages\PackageReader::$productRows = 2;
+        $prior = ['stage' => 'products', 'offset' => 1, 'processed' => 1, 'success' => 0, 'errors' => 1];
+        $result = (new ProductImporter())->importBatch(41,
+            ['file_path' => 'memory-only', 'source_fingerprint' => 'fixture', 'sideload_images' => false,
+                'mode' => $kind === 'skip' ? 'skip' : 'update'], $prior, ['max_rows' => 50]);
+        $cursor = json_decode($db->progress['cursor_json'] ?? '{}', true);
+        $checks = [
+            'last product batch retains current and previous counters' =>
+                2 === ($db->progress['processed_count'] ?? null)
+                && (int)$accept === ($db->progress['success_count'] ?? null)
+                && (2 - (int)$accept) === ($db->progress['error_count'] ?? null)
+                && 2 === ($cursor['processed'] ?? null)
+                && (int)$accept === ($cursor['success'] ?? null)
+                && (2 - (int)$accept) === ($cursor['errors'] ?? null),
+            'stage transition resets only the variants offset' =>
+                'variants' === ($cursor['stage'] ?? null) && 0 === ($cursor['offset'] ?? null)
+                && 1 === ($result['processed'] ?? null) && (int)$accept === ($result['success'] ?? null),
+            'last-batch outcome remains a truthful success or error' =>
+                ($accept ? 0 : 1) === count($db->errors) && ($accept ? 1 : 0) === count($db->maps),
+        ];
+        foreach ($checks as $label => $ok) {
+            $ok ? ++$pass : ++$fail;
+            echo ($ok ? 'PASS ' : 'FAIL ') . "EOF {$kind}: {$label}\n";
+        }
+        $cases['eof_' . $kind] = ['checks' => $checks, 'result' => $result, 'progress' => $db->progress];
+        // Empty variants resume must preserve that stage's offset and all totals.
+        $cursor['offset'] = 7;
+        (new ProductImporter())->importBatch(41,
+            ['file_path' => 'memory-only', 'sideload_images' => false], $cursor, ['max_rows' => 50]);
+        $after = json_decode($db->progress['cursor_json'] ?? '{}', true);
+        $ok = $cursor === $after;
+        $ok ? ++$pass : ++$fail;
+        echo ($ok ? 'PASS ' : 'FAIL ') . "EOF {$kind}: existing variants offset and counters remain intact\n";
+    }
 
     echo json_encode(['php' => PHP_VERSION, 'source_hashes' => $source_hashes,
         'scope' => 'real importer; Core refusal and all I/O are finite doubles; no native pairing',
