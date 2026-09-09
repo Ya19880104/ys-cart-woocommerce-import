@@ -60,10 +60,16 @@ final class ProductImporter
                         $success++;
                     }
                 } catch (Throwable $e) {
+                    if ($e instanceof \YangSheep\Ecommerce\Services\Projection\YSCatalogMutationUncertain) {
+                        throw $e;
+                    }
                     (new ErrorRepository())->record($jobId, $stage === 'variants' ? 'variant' : 'product', (string)($record['source_id'] ?? ''), $e->getMessage(), $record);
                 }
             }
         } catch (Throwable $e) {
+            if ($e instanceof \YangSheep\Ecommerce\Services\Projection\YSCatalogMutationUncertain) {
+                throw $e;
+            }
             if ($stage === 'variants') {
                 $this->saveCursor($jobId, $cursor, $offset, $processed, $success, true);
                 return ['done' => true, 'processed' => 0, 'success' => 0, 'message' => 'No variants file.'];
@@ -85,6 +91,10 @@ final class ProductImporter
     private function importProduct(int $jobId, string $fingerprint, array $record, bool $sideloadImages = true, string $mode = 'update'): int
     {
         $class = self::YS_PRODUCT;
+        $coordinator = '\\YangSheep\\Ecommerce\\Services\\Projection\\YSCatalogMutationCoordinator';
+        if (class_exists($coordinator) && $coordinator::unavailable($GLOBALS['wpdb'])) {
+            throw new \YangSheep\Ecommerce\Services\Projection\YSCatalogMutationUncertain('Product source connection requires reconciliation.');
+        }
         $data = ProductMapper::mapProduct($record);
 
         // v0.5.0 H1：圖片在交易「之前」落地到本站媒體庫（網路 I/O 不可放進 DB 交易）。
@@ -98,7 +108,15 @@ final class ProductImporter
             );
         }
 
-        // v0.5.0 C1：商品 + 屬性 + map 原子化（任一步失敗 ROLLBACK、整筆不落地）。
+        if (class_exists($coordinator)) {
+            if (!method_exists($coordinator, 'import_source_product')
+                || !method_exists('\\YangSheep\\Ecommerce\\Services\\Projection\\YSProductImportPayload', 'from_array')) {
+                throw new \RuntimeException('This Core does not support atomic source product import.');
+            }
+            return $this->importSourceProduct($jobId, $fingerprint, $record, $data, $mode);
+        }
+
+        // Older Core has no owned catalog coordinator. Retain its original atomic import path.
         return Transaction::run(function () use ($jobId, $fingerprint, $record, $class, $data, $mode): int {
             $existing = null;
 
@@ -134,6 +152,55 @@ final class ProductImporter
 
             return $productId;
         });
+    }
+
+    private function importSourceProduct(int $jobId, string $fingerprint, array $record, array $data, string $mode): int
+    {
+        global $wpdb;
+        $coordinator = '\\YangSheep\\Ecommerce\\Services\\Projection\\YSCatalogMutationCoordinator';
+        if ($coordinator::unavailable($wpdb)) {
+            throw new \YangSheep\Ecommerce\Services\Projection\YSCatalogMutationUncertain('Product source connection requires reconciliation.');
+        }
+        $maps = new MapRepository();
+        $sourceId = (string)($record['source_id'] ?? '');
+        $existing = $maps->find($fingerprint, 'product', $sourceId);
+        $skipPreparation = $mode === 'skip' && $existing !== null;
+        $attributes = [];
+        foreach ($skipPreparation ? [] : (is_array($record['attributes'] ?? null) ? $record['attributes'] : []) as $attribute) {
+            $attributes[] = ['attribute_name'=>(string)($attribute['name'] ?? ''),
+                'attribute_values'=>array_values(is_array($attribute['options'] ?? null) ? $attribute['options'] : []),
+                'display_type'=>'pill', 'sort_order'=>count($attributes)];
+        }
+        $downloads = [];
+        foreach ($skipPreparation ? [] : (is_array($record['downloads'] ?? null) ? $record['downloads'] : []) as $download) {
+            if (!is_array($download)) { continue; }
+            $downloadId = (string)($download['source_download_id'] ?? '');
+            if ($downloadId === '') { $downloadId = sha1((string)($download['file'] ?? wp_json_encode($download))); }
+            $file = $this->resolveDigitalFileReference($download, $sourceId, $downloadId);
+            if ($file === null) {
+                // Preserve the existing pre-resolution report/omit policy, before Core owns SQL.
+                (new ErrorRepository())->record($jobId, 'digital_file', $sourceId.':'.$downloadId,
+                    'Woo downloadable file is missing or cannot be resolved.', $download);
+                continue;
+            }
+            $legacy = $maps->findLegacy($fingerprint, 'digital_file', $sourceId.':'.$downloadId);
+            $downloads[] = ['source_download_id'=>$downloadId, 'legacy_file_id'=>$legacy ? (int)$legacy->target_id : null,
+                'metadata'=>$file + ['version'=>'1.0.0', 'is_active'=>1]];
+        }
+        $payload = \YangSheep\Ecommerce\Services\Projection\YSProductImportPayload::from_array([
+            'namespace'=>'woocommerce', 'fingerprint'=>$fingerprint, 'source_product_id'=>$sourceId,
+            'mode'=>$mode === 'skip' ? 'skip' : 'update', 'legacy_product_id'=>$existing ? (int)$existing->target_id : null,
+            'product'=>$data, 'attributes'=>$attributes, 'downloads'=>$downloads,
+        ]);
+        if ($payload === null) { throw new \RuntimeException('Invalid source product import payload.'); }
+        $result = (new $coordinator($wpdb))->import_source_product($payload);
+        if (($result['committed'] ?? null) === null) {
+            throw new \YangSheep\Ecommerce\Services\Projection\YSCatalogMutationUncertain('Product import commit requires reconciliation.');
+        }
+        if ($result['committed'] !== true || (int)($result['product_id'] ?? 0) < 1) {
+            throw new \RuntimeException('Unable to import source product: '.(string)($result['reason'] ?? 'definite_refusal'));
+        }
+        return (int)$result['product_id'];
     }
 
     private function importVariant(int $jobId, string $fingerprint, array $record, bool $sideloadImages = true): int
@@ -232,7 +299,7 @@ final class ProductImporter
                 'updated_at' => $now,
             ];
 
-            $existing = $mapRepo->find($fingerprint, 'digital_file', $mapSourceId);
+            $existing = $mapRepo->findLegacy($fingerprint, 'digital_file', $mapSourceId);
             if ($existing) {
                 $wpdb->update($table, $data, ['id' => (int)$existing->target_id]);
                 $fileId = (int)$existing->target_id;

@@ -5,6 +5,19 @@ All notable changes to **YS CART WC 匯入** (`ys-cart-woocommerce-import`) are 
 The format follows [Keep a Changelog](https://keepachangelog.com/) and the project
 uses semantic-ish `MAJOR.MINOR.PATCH` versioning while pre-1.0.
 
+## [0.7.16] - Unreleased
+
+### Fixed
+
+- Use Core's fixed source-product import command so the product, attributes,
+  product downloads and durable source identities commit together. Core 2.61.5
+  supplies this command; older cores without a catalog transaction owner retain
+  their existing import path.
+- Read Core product identities before retained legacy mappings, while legacy
+  upserts and variation-download writers keep their own map row identities.
+- Stop the batch and automatic UI loop when the original commit result cannot
+  be proved. Keep the current cursor and expiring job lock for reconciliation.
+
 ## [0.7.15] - Unreleased
 
 ### Fixed

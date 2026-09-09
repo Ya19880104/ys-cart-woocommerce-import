@@ -46,6 +46,7 @@ final class JobRunner
             ];
         }
 
+        $retainLock = false;
         try {
             $started = false;
             if ($job->status === 'pending') {
@@ -70,10 +71,18 @@ final class JobRunner
 
             return $result;
         } catch (Throwable $e) {
+            if ($e instanceof \YangSheep\Ecommerce\Services\Projection\YSCatalogMutationUncertain) {
+                // The original terminal is unknown. Do not write through that connection or enqueue another batch.
+                $retainLock = true;
+                return ['done'=>false, 'status'=>'reconciliation_required',
+                    'message'=>'Product import stopped because its commit result is unproven. Reconcile before retrying.'];
+            }
             $repo->fail($jobId, $e->getMessage());
             return ['status' => 'failed', 'message' => $e->getMessage()];
         } finally {
-            $this->releaseJobLock($jobId);
+            if (!$retainLock) {
+                $this->releaseJobLock($jobId);
+            }
         }
     }
 

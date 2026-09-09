@@ -65,7 +65,13 @@
         button.setAttribute('aria-busy', busy ? 'true' : 'false');
     };
 
-    const api = (path, options = {}) => window.wp.apiFetch({ path, ...options });
+    const api = async (path, options = {}) => {
+        const result = await window.wp.apiFetch({ path, ...options });
+        if (/\/jobs\/\d+\/run-next$/.test(path) && result?.status === 'reconciliation_required') {
+            throw new Error('匯入已暫停，請確認上一批結果後再重試。');
+        }
+        return result;
+    };
     const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const isTerminal = (status) => ['completed', 'failed', 'cancelled'].includes(String(status || ''));
     const canRun = (status) => !isTerminal(status);
