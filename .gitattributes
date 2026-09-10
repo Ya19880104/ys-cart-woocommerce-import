@@ -2,11 +2,13 @@
 #
 # 在此之前這個 repo 沒有邊界宣告，出貨 zip 的內容取決於打包當下用的腳本；
 # 邊界寫在這裡，任何打包方式都拿到同一組檔案。
+#
+# 🔴 只排掉 v0.7.13 本來就沒有出貨的東西（tests/、docs/）。發版不順手改變出貨
+# 內容：`.gitignore` 與根 composer.json 過去有出貨，維持原樣。
+#
+# 🔴 pattern 不帶斜線會在任何層級生效——`composer.json` 曾經連
+# `vendor/yangsheep/ys-plugin-hub-client/composer.json` 一起排掉（那是 vendored
+# 相依自己的檔）。要限定根目錄就寫 `/composer.json`。
 tests/ export-ignore
 docs/ export-ignore
-composer.json export-ignore
-composer.lock export-ignore
-package.json export-ignore
-package-lock.json export-ignore
-.gitignore export-ignore
 .gitattributes export-ignore
