@@ -1,0 +1,12 @@
+# ── 發布套件邊界（git archive 的 export-ignore）────────────────────────────────
+#
+# 在此之前這個 repo 沒有邊界宣告，出貨 zip 的內容取決於打包當下用的腳本；
+# 邊界寫在這裡，任何打包方式都拿到同一組檔案。
+tests/ export-ignore
+docs/ export-ignore
+composer.json export-ignore
+composer.lock export-ignore
+package.json export-ignore
+package-lock.json export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
